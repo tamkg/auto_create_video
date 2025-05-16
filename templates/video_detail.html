@@ -1,0 +1,60 @@
+<!-- templates/video_detail.html -->
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Chi tiết Video - {{ video.title }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: auto; }
+        h1 { margin-bottom: 20px; }
+        .segment {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .segment h3 {
+            margin-top: 0;
+        }
+        .images img {
+            max-width: 150px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        a.btn-back {
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 6px 12px;
+            background: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+        a.btn-back:hover {
+            background: #5a6268;
+        }
+    </style>
+</head>
+<body>
+    <a href="{{ url_for('index') }}" class="btn-back">&larr; Quay lại danh sách</a>
+    <h1>{{ video.title }}</h1>
+
+    {% for segment in video.segments|sort(attribute='order_index') %}
+        <div class="segment">
+            <h3>Đoạn {{ segment.order_index }}</h3>
+            <p>{{ segment.text }}</p>
+            <div class="images">
+                {% for image in segment.images|sort(attribute='order_index') %}
+                    <img src="{{ url_for('static', filename=image.file_path.split('static/')[-1]) }}" alt="Image {{ loop.index }}">
+                {% else %}
+                    <p><i>Không có hình ảnh kèm theo.</i></p>
+                {% endfor %}
+            </div>
+        </div>
+    {% else %}
+        <p>Video chưa có đoạn nào.</p>
+    {% endfor %}
+</body>
+</html>

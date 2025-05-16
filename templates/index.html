@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Danh sách Video</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 900px;
+            margin: auto;
+            background-color: #f9f9f9;
+        }
+        .video-card {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 1px 1px 5px #ddd;
+            background-color: white;
+            position: relative;
+        }
+        .video-card h2 {
+            margin: 0 0 10px 0;
+        }
+        .btn {
+            display: inline-block;
+            background: #007BFF;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            text-decoration: none;
+            margin-top: 10px;
+            border: none;
+            cursor: pointer;
+        }
+        .btn:hover { background: #0056b3; }
+        .btn-green { background: #28a745; }
+        .btn-purple { background: #6f42c1; }
+        .btn-red { background: #dc3545; }
+        .btn-green:hover { background: #218838; }
+        .btn-purple:hover { background: #5936a1; }
+        .btn-red:hover { background: #c82333; }
+        .flash-message {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border: 1px solid #c3e6cb;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        label {
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        select, input {
+            padding: 4px 6px;
+            margin: 5px 0;
+        }
+        .export-section {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f0f8ff;
+            border-radius: 6px;
+        }
+        .settings-popup {
+            display: none;
+            position: absolute;
+            top: 20px;
+            right: 10px;
+            background: #fff;
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 6px;
+            box-shadow: 0 0 10px #aaa;
+            z-index: 100;
+            width: 280px;
+        }
+        .settings-popup.active {
+            display: block;
+        }
+    </style>
+    <script>
+        function toggleSettings(id) {
+            const popup = document.getElementById("settings_" + id);
+            popup.classList.toggle("active");
+        }
+         function toggleNote() {
+        const popup = document.getElementById("global-note");
+        popup.classList.toggle("active");
+    }
+
+    // Đóng popup khi click ngoài
+    document.addEventListener('click', function(event) {
+        const note = document.getElementById("global-note");
+        const button = event.target.closest("button");
+
+        if (!note.contains(event.target) && (!button || !button.onclick || button.onclick.toString().indexOf('toggleNote') === -1)) {
+            note.classList.remove("active");
+        }
+    });
+    </script>
+</head>
+<body>
+    <h1>📼 Danh sách Video</h1>
+    <button class="btn" onclick="toggleNote()">❓ Giải thích tham số xuất video</button>
+    <div id="global-note" class="settings-popup" style="right: auto; left: 50%; transform: translateX(-50%); top: 100px;">
+    <strong>📝 Giải thích tham số xuất video:</strong>
+    <ul style="padding-left: 18px; font-size: 14px;">
+        <li><strong>fps</strong>: Số khung hình mỗi giây (thường dùng 24 hoặc 30).</li>
+        <li><strong>codec</strong>: Bộ mã hóa video (ví dụ <code>libx264</code> - chuẩn H.264).</li>
+        <li><strong>bitrate</strong>: Chất lượng video tính theo kbps. VD: <code>3000k</code> = 3Mbps.</li>
+        <li><strong>preset</strong>: Tốc độ mã hóa (càng chậm chất lượng càng cao): <code>fast</code>, <code>medium</code>, <code>slow</code>...</li>
+        <li><strong>audio_codec</strong>: Bộ mã hóa âm thanh (<code>aac</code> hoặc <code>libmp3lame</code>).</li>
+        <li><strong>audio_bitrate</strong>: Chất lượng âm thanh (thường <code>128k</code> đến <code>192k</code>).</li>
+        <button style="float:right; background:none; border:none; font-size:16px;" onclick="toggleNote()">✖</button>
+
+    </ul>
+</div>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="flash-message">
+          {% for message in messages %}
+            <p>{{ message }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <a href="{{ url_for('create_video') }}" class="btn">+ Tạo Video Mới</a>
+
+    {% for video in videos %}
+    <div class="video-card">
+        <h2>{{ video.title }}</h2>
+        <p><strong>ID:</strong> {{ video.id }}</p>
+        <p><strong>Ngày tạo:</strong> {{ video.created_at.strftime("%d/%m/%Y %H:%M") if video.created_at else 'Chưa có' }}</p>
+
+        <a href="{{ url_for('video_detail', video_id=video.id) }}" class="btn">Xem Chi Tiết</a>
+        <a href="{{ url_for('edit_video', video_id=video.id) }}" class="btn btn-green">Sửa</a>
+
+        <div class="export-section">
+            <form action="{{ url_for('export_video', video_id=video.id) }}" method="GET">
+                <div>
+                    <label for="lang_{{ video.id }}">Ngôn ngữ:</label>
+                    <select name="lang" id="lang_{{ video.id }}">
+                        {% for code, name in languages.items() %}
+                            <option value="{{ code }}">{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="ratio_{{ video.id }}">Tỉ lệ video:</label>
+                    <select name="ratio" id="ratio_{{ video.id }}">
+                        <option value="horizontal">🎬 16:9 (YouTube)</option>
+                        <option value="vertical">📱 9:16 (TikTok, Shorts)</option>
+                        <option value="square">⬛ 1:1 (Instagram)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="voice_{{ video.id }}">Giọng:</label>
+                    <select name="voice" id="voice_{{ video.id }}">
+                        <option value="default">Mặc định</option>
+                    </select>
+                </div>
+
+                <button type="button" class="btn btn-green" onclick="toggleSettings({{ video.id }})">⚙ Cài Đặt</button>
+
+                <div id="settings_{{ video.id }}" class="settings-popup">
+                    <div>
+                        <label>Codec:</label>
+                        <select name="codec">
+                            <option value="libx264" selected>libx264</option>
+                            <option value="libx265">libx265</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Bitrate:</label>
+                        <input type="text" name="bitrate" value="3000k">
+                    </div>
+                    <div>
+                        <label>Preset:</label>
+                        <select name="preset">
+                            <option value="ultrafast">ultrafast</option>
+                            <option value="superfast">superfast</option>
+                            <option value="veryfast">veryfast</option>
+                            <option value="faster">faster</option>
+                            <option value="fast">fast</option>
+                            <option value="medium" selected>medium</option>
+                            <option value="slow">slow</option>
+                            <option value="slower">slower</option>
+                            <option value="veryslow">veryslow</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Audio codec:</label>
+                        <select name="audio_codec">
+                            <option value="aac" selected>AAC</option>
+                            <option value="libmp3lame">MP3</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Audio bitrate:</label>
+                        <input type="text" name="audio_bitrate" value="192k">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-purple">🎞 Export Video</button>
+            </form>
+        </div>
+
+        <form action="{{ url_for('delete_video', video_id=video.id) }}" method="POST" style="display:inline;">
+            <button type="submit" class="btn btn-red" onclick="return confirm('Bạn có chắc muốn xoá video này không?');">🗑 Xoá</button>
+        </form>
+    </div>
+    {% else %}
+        <p>Chưa có video nào.</p>
+    {% endfor %}
+</body>
+</html>

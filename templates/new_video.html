@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tạo Video Mới</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 900px; margin: auto; background: #f9f9f9; }
+    h1 { color: #333; }
+    form { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    .segment {
+      border: 1px solid #ccc;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 6px;
+      background: #fff;
+      position: relative;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .segment label {
+      font-weight: 600;
+      display: block;
+      margin-bottom: 6px;
+      color: #444;
+    }
+    .segment textarea {
+      width: 100%;
+      min-height: 80px;
+      padding: 8px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      resize: vertical;
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+    .images input[type="file"] {
+      margin-top: 8px;
+      display: block;
+    }
+    .preview-images {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .preview-images img {
+      max-height: 80px;
+      border-radius: 5px;
+      border: 1px solid #ddd;
+      position: relative;
+    }
+    .preview-images .img-wrapper {
+      position: relative;
+      display: inline-block;
+    }
+    .preview-images .remove-btn {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 14px;
+      line-height: 18px;
+      text-align: center;
+      padding: 0;
+    }
+    button, .btn-delete-segment {
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: 600;
+      margin-top: 10px;
+      transition: background-color 0.3s ease;
+    }
+    button:hover, .btn-delete-segment:hover {
+      background-color: #0056b3;
+    }
+    .btn-delete-segment {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background-color: #dc3545;
+      padding: 5px 10px;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Tạo Video Mới</h1>
+  <form method="POST" enctype="multipart/form-data" id="video-form">
+    <label>Tiêu đề video:</label><br />
+    <input type="text" name="title" required style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box;"><br /><br />
+
+    <div id="segments-container">
+      <!-- Các đoạn text (segment) sẽ thêm vào đây -->
+    </div>
+
+    <button type="button" onclick="addSegment()">+ Thêm đoạn text</button><br><br>
+
+    <button type="submit">Lưu Video</button>
+  </form>
+
+  <script>
+    let segmentIndex = 0;
+
+    function addSegment() {
+      segmentIndex++;
+      const container = document.getElementById('segments-container');
+
+      const segmentDiv = document.createElement('div');
+      segmentDiv.classList.add('segment');
+      segmentDiv.setAttribute('data-index', segmentIndex);
+
+      segmentDiv.innerHTML = `
+        <button type="button" class="btn-delete-segment" onclick="removeSegment(this)">Xóa đoạn</button>
+        <label>Đoạn văn bản ${segmentIndex}:</label>
+        <textarea name="segment_text_${segmentIndex}" rows="3" required></textarea>
+
+        <div class="images">
+          <label>Ảnh đi kèm:</label>
+          <input type="file" name="segment_images_${segmentIndex}" multiple accept="image/*" onchange="previewImages(this, ${segmentIndex})">
+          <div id="preview_segment_${segmentIndex}" class="preview-images"></div>
+        </div>
+      `;
+
+      container.appendChild(segmentDiv);
+    }
+
+    function removeSegment(button) {
+      const segmentDiv = button.closest('.segment');
+      segmentDiv.remove();
+      // Nếu muốn bạn có thể update lại label đoạn sau khi xóa (không bắt buộc)
+      updateSegmentLabels();
+    }
+
+    function updateSegmentLabels() {
+      const segments = document.querySelectorAll('.segment');
+      segments.forEach((seg, i) => {
+        seg.querySelector('label').textContent = `Đoạn văn bản ${i + 1}:`;
+        seg.setAttribute('data-index', i + 1);
+        seg.querySelector('textarea').name = `segment_text_${i + 1}`;
+        const fileInput = seg.querySelector('input[type=file]');
+        fileInput.name = `segment_images_${i + 1}`;
+        const previewDiv = seg.querySelector('.preview-images');
+        previewDiv.id = `preview_segment_${i + 1}`;
+      });
+      segmentIndex = segments.length;
+    }
+
+    function previewImages(input, idx) {
+      const previewContainer = document.getElementById(`preview_segment_${idx}`);
+      previewContainer.innerHTML = ''; // Xóa ảnh cũ
+      
+      if (input.files) {
+        Array.from(input.files).forEach((file, i) => {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            const wrapper = document.createElement('div');
+            wrapper.classList.add('img-wrapper');
+
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.alt = file.name;
+
+            const btnRemove = document.createElement('button');
+            btnRemove.type = 'button';
+            btnRemove.className = 'remove-btn';
+            btnRemove.title = 'Xóa ảnh';
+            btnRemove.innerHTML = '&times;';
+            btnRemove.onclick = () => {
+              // Xóa ảnh khỏi preview và xóa khỏi file input
+              wrapper.remove();
+              removeFileFromInput(input, i);
+            };
+
+            wrapper.appendChild(img);
+            wrapper.appendChild(btnRemove);
+            previewContainer.appendChild(wrapper);
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+    }
+
+    // Xóa 1 file khỏi input type=file (không chuẩn nên dùng DataTransfer để thay đổi files)
+    function removeFileFromInput(input, indexToRemove) {
+      const dt = new DataTransfer();
+      const files = input.files;
+      for (let i = 0; i < files.length; i++) {
+        if (i !== indexToRemove) {
+          dt.items.add(files[i]);
+        }
+      }
+      input.files = dt.files;
+    }
+
+    // Tạo segment đầu tiên tự động khi load trang (tuỳ chọn)
+    window.onload = () => {
+      addSegment();
+    };
+  </script>
+</body>
+</html>

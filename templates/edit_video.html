@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <title>Sửa Video - {{ video.title }}</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            padding: 20px; max-width: 900px; margin: auto; background: #f9f9f9; 
+        }
+        h1, h2 {
+            color: #333;
+        }
+        form {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgb(0 0 0 / 0.1);
+        }
+        label {
+            font-weight: 600;
+            margin-top: 10px;
+            display: block;
+            color: #444;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 8px 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-size: 1rem;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        textarea {
+            min-height: 80px;
+        }
+        .segment-block {
+            border: 1px solid #ddd;
+            background: #fff;
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgb(0 0 0 / 0.05);
+            position: relative;
+        }
+        button, a.button-link {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: none;
+            margin-right: 10px;
+            display: inline-block;
+            transition: background-color 0.3s ease;
+        }
+        button:hover, a.button-link:hover {
+            background-color: #0056b3;
+        }
+        ul.image-list {
+            list-style: none;
+            padding-left: 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 10px;
+        }
+        ul.image-list li {
+            position: relative;
+            border: 1px solid #ccc;
+            padding: 5px;
+            border-radius: 5px;
+            background: #fefefe;
+            max-width: 120px;
+        }
+        ul.image-list img {
+            max-width: 100%;
+            border-radius: 4px;
+            display: block;
+            margin-bottom: 6px;
+        }
+        ul.image-list a {
+            color: #dc3545;
+            font-size: 0.9rem;
+            text-decoration: none;
+        }
+        ul.image-list a:hover {
+            text-decoration: underline;
+        }
+        .preview-images {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .preview-images img {
+            max-height: 80px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        /* Nút xóa đoạn */
+        .delete-segment-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #dc3545;
+            border: none;
+            color: white;
+            font-weight: 700;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .delete-segment-btn:hover {
+            background-color: #a71d2a;
+        }
+    </style>
+</head>
+<body>
+    <h1>Sửa Video - {{ video.title }}</h1>
+    <form method="post" enctype="multipart/form-data" id="editVideoForm">
+        <label for="title">Tiêu đề video:</label>
+        <input type="text" id="title" name="title" value="{{ video.title }}" required />
+
+        <h2>Các đoạn:</h2>
+        <div id="segments-container">
+            {% for segment in video.segments|sort(attribute='order_index') %}
+            <div class="segment-block" data-idx="{{ loop.index0 }}">
+                <button type="button" class="delete-segment-btn" onclick="deleteSegment(this)">Xóa đoạn</button>
+
+                <label>Đoạn {{ segment.order_index }}:</label>
+                <textarea name="segment_text_{{ loop.index0 }}" rows="3" required>{{ segment.text }}</textarea>
+                
+                <label>Ảnh kèm (chọn để thêm mới):</label>
+                <input type="file" name="segment_images_{{ loop.index0 }}" multiple accept="image/*" onchange="previewImages(this, {{ loop.index0 }})" />
+                
+                <div id="preview_segment_{{ loop.index0 }}" class="preview-images"></div>
+
+                {% if segment.images %}
+                    <p>Ảnh hiện có:</p>
+                    <ul class="image-list">
+                        {% for img in segment.images|sort(attribute='order_index') %}
+                        <li>
+                            <img src="{{ url_for('static', filename=img.file_path.split('static/')[-1]) }}" alt="Image" />
+                            <a href="{{ url_for('delete_image', image_id=img.id) }}" onclick="return confirm('Xóa ảnh này?')">Xóa ảnh</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        <button type="button" onclick="addSegment()">+ Thêm đoạn</button><br /><br />
+
+        <button type="submit">Lưu thay đổi</button>
+        <a href="{{ url_for('video_detail', video_id=video.id) }}" class="button-link">Hủy</a>
+    </form>
+
+<script>
+    function addSegment() {
+        const container = document.getElementById('segments-container');
+        const idx = container.children.length;
+        const div = document.createElement('div');
+        div.className = 'segment-block';
+        div.setAttribute('data-idx', idx);
+        div.innerHTML = `
+            <button type="button" class="delete-segment-btn" onclick="deleteSegment(this)">Xóa đoạn</button>
+            <label>Đoạn ${idx + 1}:</label>
+            <textarea name="segment_text_${idx}" rows="3" required></textarea>
+            <br />
+            <label>Ảnh kèm (có thể chọn nhiều):</label>
+            <input type="file" name="segment_images_${idx}" multiple accept="image/*" onchange="previewImages(this, ${idx})" />
+            <div id="preview_segment_${idx}" class="preview-images"></div>
+        `;
+        container.appendChild(div);
+    }
+
+    function previewImages(input, idx) {
+        const previewContainer = document.getElementById(`preview_segment_${idx}`);
+        previewContainer.innerHTML = ''; // Xóa ảnh cũ
+        
+        if (input.files) {
+            Array.from(input.files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    previewContainer.appendChild(img);
+                }
+                reader.readAsDataURL(file);
+            });
+        }
+    }
+
+    function deleteSegment(button) {
+        if(confirm('Bạn có chắc muốn xóa đoạn này?')) {
+            const segmentDiv = button.closest('.segment-block');
+            if (segmentDiv) {
+                segmentDiv.remove();
+            }
+        }
+    }
+</script>
+</body>
+</html>
