@@ -185,8 +185,8 @@ def delete_image(image_id):
 def export_video(video_id):
     # Lấy thêm các thông số cấu hình video từ form
     codec = request.args.get("codec", "libx264")
-    bitrate = request.args.get("bitrate", "3000k")
-    preset = request.args.get("preset", "medium")
+    bitrate = request.args.get("bitrate", "8000k")  # Tăng bitrate video
+    preset = request.args.get("preset", "slow")     # Chất lượng cao hơn
     audio_codec = request.args.get("audio_codec", "aac")
     audio_bitrate = request.args.get("audio_bitrate", "192k")    
 
@@ -199,7 +199,6 @@ def export_video(video_id):
 
     # Lấy tham số từ query string
     target_lang = request.args.get("lang", "en")
-    voice = request.args.get("voice", "default")  # chưa dùng nhưng giữ lại
     ratio = request.args.get("ratio", "horizontal")  # new
 
     supported_langs = tts_langs()
@@ -209,11 +208,11 @@ def export_video(video_id):
 
     # Xác định kích thước video theo tỉ lệ
     if ratio == "vertical":
-        target_size = (720, 1280)  # 9:16
+        target_size = (1080, 1920)  # 9:16 Full HD
     elif ratio == "square":
-        target_size = (720, 720)   # 1:1
+        target_size = (1080, 1080)  # 1:1 Full HD
     else:
-        target_size = (854, 480)   # 16:9 (default)
+        target_size = (1920, 1080)  # 16:9 Full HD
 
     temp_dir = tempfile.mkdtemp()
     clips = []
@@ -243,10 +242,31 @@ def export_video(video_id):
                     flash(f"Không tìm thấy ảnh cho đoạn {i + 1}")
                     continue
 
+                # Resize ảnh với chất lượng cao, giữ tỷ lệ gốc (letterbox)
+                # Xử lý ảnh để full màn hình (không méo)
                 with PILImage.open(img_path) as img:
-                    img_resized = img.resize(target_size)
+                    img_ratio = img.width / img.height
+                    target_ratio = target_size[0] / target_size[1]
+
+                    if img_ratio > target_ratio:
+                        # Ảnh rộng hơn tỷ lệ, cắt chiều ngang
+                        new_height = target_size[1]
+                        new_width = int(new_height * img_ratio)
+                    else:
+                        # Ảnh cao hơn tỷ lệ, cắt chiều dọc
+                        new_width = target_size[0]
+                        new_height = int(new_width / img_ratio)
+
+                    # Resize với chất lượng cao
+                    img = img.resize((new_width, new_height), PILImage.Resampling.LANCZOS)
+
+                    # Tạo nền đen và dán ảnh vào giữa (letterbox)
+                    background = PILImage.new("RGB", target_size, (0, 0, 0))
+                    background.paste(
+                        img, ((target_size[0] - new_width) // 2, (target_size[1] - new_height) // 2)
+                    )
                     resized_img_path = os.path.join(temp_dir, f"resized_{i}.jpg")
-                    img_resized.save(resized_img_path)
+                    background.save(resized_img_path, quality=95)
 
                 # Tạo video clip từ ảnh + audio
                 audio_clip = AudioFileClip(audio_path)
@@ -268,18 +288,18 @@ def export_video(video_id):
 
         final_clip = concatenate_videoclips(clips, method="compose")
         output_path = os.path.join(exports_dir, f"{video.title}_{ratio}_export.mp4")
-        audio_temp_path = os.path.join(temp_dir, "temp_audio.m4a")  # hoặc .mp3 nếu codec phù hợp
+        audio_temp_path = os.path.join(temp_dir, "temp_audio.m4a")
 
         final_clip.write_videofile(
             output_path,
-            fps=24,
+            fps=60,  # Khung hình cao hơn nên để 30 cho ảnh còn đâu 60 là cho video động 
             codec=codec,
             bitrate=bitrate,
             preset=preset,
             audio_codec=audio_codec,
             audio_bitrate=audio_bitrate,
-            temp_audiofile=audio_temp_path,       # ⭐ dùng file audio tạm của chính mình
-            remove_temp=True                      # ⭐ vẫn cho phép moviepy tự xoá nếu muốn
+            temp_audiofile=audio_temp_path,
+            remove_temp=True
         )
 
         return send_file(output_path, as_attachment=True)
@@ -293,4 +313,4 @@ def export_video(video_id):
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0",debug=True, port=5678)
