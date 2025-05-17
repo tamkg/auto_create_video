@@ -3,6 +3,7 @@ from extensions import db
 from models import Video, Segment, Image
 import os
 from werkzeug.utils import secure_filename
+from flask_migrate import Migrate 
 
 from flask import send_file
 from gtts import gTTS
@@ -15,6 +16,9 @@ from deep_translator import GoogleTranslator
 
 from PIL import Image as PILImage
 
+from blueprints.trends.routes import trends_bp
+from blueprints.downloads.routes import download_bp
+from blueprints.urls.routes import url_manager_bp
 
 import logging
 logging.basicConfig(level=logging.DEBUG)
@@ -25,12 +29,17 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, 'data.db')}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+app.register_blueprint(trends_bp, url_prefix='/trends')
+app.register_blueprint(download_bp, url_prefix='/downloads')
+app.register_blueprint(url_manager_bp, url_prefix='/url')  # ✅ Đăng ký URL Manager Blueprint
+
 UPLOAD_FOLDER = os.path.join(basedir, 'static/uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.secret_key = 'some_secret_key'  # cần để flash message
 
 db.init_app(app)
+migrate = Migrate(app, db)  # ✅ Khởi tạo Flask-Migrate
 
 with app.app_context():
     db.create_all()
@@ -242,31 +251,29 @@ def export_video(video_id):
                     flash(f"Không tìm thấy ảnh cho đoạn {i + 1}")
                     continue
 
-                # Resize ảnh với chất lượng cao, giữ tỷ lệ gốc (letterbox)
-                # Xử lý ảnh để full màn hình (không méo)
+                # Xử lý ảnh để full màn hình (tự động crop thông minh)
                 with PILImage.open(img_path) as img:
                     img_ratio = img.width / img.height
                     target_ratio = target_size[0] / target_size[1]
 
                     if img_ratio > target_ratio:
-                        # Ảnh rộng hơn tỷ lệ, cắt chiều ngang
+                        # Ảnh rộng hơn tỷ lệ, crop chiều ngang
                         new_height = target_size[1]
                         new_width = int(new_height * img_ratio)
+                        img = img.resize((new_width, new_height), PILImage.Resampling.LANCZOS)
+                        left = (new_width - target_size[0]) // 2
+                        img = img.crop((left, 0, left + target_size[0], target_size[1]))
                     else:
-                        # Ảnh cao hơn tỷ lệ, cắt chiều dọc
+                        # Ảnh cao hơn tỷ lệ, crop chiều dọc
                         new_width = target_size[0]
                         new_height = int(new_width / img_ratio)
+                        img = img.resize((new_width, new_height), PILImage.Resampling.LANCZOS)
+                        top = (new_height - target_size[1]) // 2
+                        img = img.crop((0, top, target_size[0], top + target_size[1]))
 
-                    # Resize với chất lượng cao
-                    img = img.resize((new_width, new_height), PILImage.Resampling.LANCZOS)
-
-                    # Tạo nền đen và dán ảnh vào giữa (letterbox)
-                    background = PILImage.new("RGB", target_size, (0, 0, 0))
-                    background.paste(
-                        img, ((target_size[0] - new_width) // 2, (target_size[1] - new_height) // 2)
-                    )
+                    # Lưu ảnh đã được crop và resize
                     resized_img_path = os.path.join(temp_dir, f"resized_{i}.jpg")
-                    background.save(resized_img_path, quality=95)
+                    img.save(resized_img_path, quality=95)
 
                 # Tạo video clip từ ảnh + audio
                 audio_clip = AudioFileClip(audio_path)

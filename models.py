@@ -1,4 +1,5 @@
 from extensions import db
+from datetime import datetime
 
 class Video(db.Model):
     __tablename__ = 'videos'
@@ -21,3 +22,14 @@ class Image(db.Model):
     segment_id = db.Column(db.Integer, db.ForeignKey('segments.id'), nullable=False)
     file_path = db.Column(db.String(255), nullable=False)
     order_index = db.Column(db.Integer, nullable=False)
+
+class DownloadUrl(db.Model):
+    __tablename__ = 'download_urls'
+    id = db.Column(db.Integer, primary_key=True)
+    url = db.Column(db.String(1024), unique=True, nullable=False)
+    category = db.Column(db.String(50), default='none', nullable=False)  
+    status = db.Column(db.String(20), default='pending', nullable=False)
+    title = db.Column(db.String(255))
+    ratio = db.Column(db.String(20), nullable=True)  # Thêm cột tỷ lệ khung hình
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

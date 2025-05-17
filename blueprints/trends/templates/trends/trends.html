@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Google Trends Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        input, select, button {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            outline: none;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #flash-messages {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+        }
+        #trend-results {
+            margin-top: 20px;
+        }
+        #trend-results img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin-top: 10px;
+        }
+        #loading {
+            display: none;
+            text-align: center;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 Google Trends Viewer</h1>
+
+    <div id="flash-messages" style="display: none;"></div>
+
+    <form id="trend-form">
+        <label for="keywords">Nhập từ khóa (cách nhau bởi dấu phẩy):</label>
+        <input type="text" name="keywords" placeholder="Ví dụ: python, ai, blockchain" required>
+
+        <label for="timeframe">Chọn khung thời gian:</label>
+        <select name="timeframe">
+            <option value="today 12-m">12 tháng qua</option>
+            <option value="today 3-m">3 tháng qua</option>
+            <option value="today 1-m">1 tháng qua</option>
+            <option value="today 7-d">7 ngày qua</option>
+            <option value="now 1-d">24 giờ qua</option>
+        </select>
+
+        <button type="submit">📊 Xem Xu Hướng</button>
+    </form>
+
+    <div id="loading">⏳ Đang tải biểu đồ xu hướng...</div>
+
+    <div id="trend-results">
+        <h2>Kết quả xu hướng:</h2>
+        <img id="trend-chart" src="" alt="Kết quả biểu đồ xu hướng" style="display:none;">
+    </div>
+
+    <script>
+        document.querySelector('#trend-form').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+            const flashMessages = document.getElementById('flash-messages');
+            const trendChart = document.getElementById('trend-chart');
+            const loading = document.getElementById('loading');
+
+            flashMessages.style.display = "none";
+            trendChart.style.display = "none";
+            loading.style.display = "block";
+
+            try {
+                const response = await fetch('/trends/trends', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                loading.style.display = "none";
+
+                if (response.headers.get("Content-Type").includes("image/png")) {
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    trendChart.src = url;
+                    trendChart.style.display = "block";
+                } else {
+                    const result = await response.json();
+                    flashMessages.textContent = result.message || "Không tìm thấy xu hướng cho từ khóa này.";
+                    flashMessages.style.display = "block";
+                }
+            } catch (error) {
+                loading.style.display = "none";
+                flashMessages.textContent = "Đã xảy ra lỗi khi tải biểu đồ. Vui lòng thử lại.";
+                flashMessages.style.display = "block";
+            }
+        });
+    </script>
+</body>
+</html>
