@@ -1,130 +1,96 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Google Trends Viewer</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f4f4f9;
-            color: #333;
-        }
-        h1 {
-            text-align: center;
-        }
-        form {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        input, select, button {
-            padding: 10px;
-            font-size: 16px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            outline: none;
-        }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        #flash-messages {
-            margin-bottom: 15px;
-            padding: 10px;
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-            border-radius: 5px;
-        }
-        #trend-results {
-            margin-top: 20px;
-        }
-        #trend-results img {
-            max-width: 100%;
-            height: auto;
-            display: block;
-            margin-top: 10px;
-        }
-        #loading {
-            display: none;
-            text-align: center;
-            font-size: 16px;
-            margin-top: 10px;
-        }
-    </style>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
 </head>
-<body>
-    <h1>📊 Google Trends Viewer</h1>
+<body class="bg-light">
 
-    <div id="flash-messages" style="display: none;"></div>
+<div class="container py-4" style="max-width: 600px;">
+    <h1 class="text-center mb-4">📊 Google Trends Viewer</h1>
 
-    <form id="trend-form">
-        <label for="keywords">Nhập từ khóa (cách nhau bởi dấu phẩy):</label>
-        <input type="text" name="keywords" placeholder="Ví dụ: python, ai, blockchain" required>
+    <div id="flash-messages" class="alert alert-danger d-none" role="alert"></div>
 
-        <label for="timeframe">Chọn khung thời gian:</label>
-        <select name="timeframe">
-            <option value="today 12-m">12 tháng qua</option>
-            <option value="today 3-m">3 tháng qua</option>
-            <option value="today 1-m">1 tháng qua</option>
-            <option value="today 7-d">7 ngày qua</option>
-            <option value="now 1-d">24 giờ qua</option>
-        </select>
+    <form id="trend-form" class="mb-4">
+        <div class="mb-3">
+            <label for="keywords" class="form-label">Nhập từ khóa (cách nhau bởi dấu phẩy):</label>
+            <input type="text" name="keywords" id="keywords" class="form-control" placeholder="Ví dụ: python, ai, blockchain" required />
+        </div>
 
-        <button type="submit">📊 Xem Xu Hướng</button>
+        <div class="mb-3">
+            <label for="timeframe" class="form-label">Chọn khung thời gian:</label>
+            <select name="timeframe" id="timeframe" class="form-select">
+                <option value="today 12-m">12 tháng qua</option>
+                <option value="today 3-m">3 tháng qua</option>
+                <option value="today 1-m">1 tháng qua</option>
+                <option value="today 7-d">7 ngày qua</option>
+                <option value="now 1-d">24 giờ qua</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-success w-100">📊 Xem Xu Hướng</button>
     </form>
 
-    <div id="loading">⏳ Đang tải biểu đồ xu hướng...</div>
-
-    <div id="trend-results">
-        <h2>Kết quả xu hướng:</h2>
-        <img id="trend-chart" src="" alt="Kết quả biểu đồ xu hướng" style="display:none;">
+    <div id="loading" class="text-center mb-3" style="display:none;">
+        <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+        <div>Đang tải biểu đồ xu hướng...</div>
     </div>
 
-    <script>
-        document.querySelector('#trend-form').addEventListener('submit', async function(event) {
-            event.preventDefault();
-            const formData = new FormData(this);
-            const flashMessages = document.getElementById('flash-messages');
-            const trendChart = document.getElementById('trend-chart');
-            const loading = document.getElementById('loading');
+    <div id="trend-results" class="d-none">
+        <h2>Kết quả xu hướng:</h2>
+        <img id="trend-chart" src="" alt="Kết quả biểu đồ xu hướng" class="img-fluid rounded mt-3" />
+    </div>
+</div>
 
-            flashMessages.style.display = "none";
-            trendChart.style.display = "none";
-            loading.style.display = "block";
+<!-- Bootstrap JS Bundle (Popper + Bootstrap JS) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-            try {
-                const response = await fetch('/trends/trends', {
-                    method: 'POST',
-                    body: formData
-                });
+<script>
+    const form = document.getElementById('trend-form');
+    const flashMessages = document.getElementById('flash-messages');
+    const trendChart = document.getElementById('trend-chart');
+    const loading = document.getElementById('loading');
+    const trendResults = document.getElementById('trend-results');
 
-                loading.style.display = "none";
+    form.addEventListener('submit', async function(event) {
+        event.preventDefault();
+        const formData = new FormData(this);
 
-                if (response.headers.get("Content-Type").includes("image/png")) {
-                    const blob = await response.blob();
-                    const url = URL.createObjectURL(blob);
-                    trendChart.src = url;
-                    trendChart.style.display = "block";
-                } else {
-                    const result = await response.json();
-                    flashMessages.textContent = result.message || "Không tìm thấy xu hướng cho từ khóa này.";
-                    flashMessages.style.display = "block";
-                }
-            } catch (error) {
-                loading.style.display = "none";
-                flashMessages.textContent = "Đã xảy ra lỗi khi tải biểu đồ. Vui lòng thử lại.";
-                flashMessages.style.display = "block";
+        flashMessages.classList.add('d-none');
+        flashMessages.textContent = '';
+        trendChart.style.display = 'none';
+        trendResults.classList.add('d-none');
+        loading.style.display = 'block';
+
+        try {
+            const response = await fetch('/trends/trends', {
+                method: 'POST',
+                body: formData
+            });
+
+            loading.style.display = 'none';
+
+            if (response.headers.get("Content-Type")?.includes("image/png")) {
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                trendChart.src = url;
+                trendChart.style.display = 'block';
+                trendResults.classList.remove('d-none');
+            } else {
+                const result = await response.json();
+                flashMessages.textContent = result.message || "Không tìm thấy xu hướng cho từ khóa này.";
+                flashMessages.classList.remove('d-none');
             }
-        });
-    </script>
+        } catch (error) {
+            loading.style.display = 'none';
+            flashMessages.textContent = "Đã xảy ra lỗi khi tải biểu đồ. Vui lòng thử lại.";
+            flashMessages.classList.remove('d-none');
+        }
+    });
+</script>
+
 </body>
 </html>

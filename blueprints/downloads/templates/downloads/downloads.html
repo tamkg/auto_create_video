@@ -4,189 +4,167 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🎬 Video Downloader</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 30px;
-            background-color: #f5f5f5;
-            color: #333;
-            max-width: 800px;
-            margin: 0 auto;
-        }
-
-        h2 {
-            text-align: center;
-        }
-
-        .section {
-            background: #ffffff;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .section h3 {
-            margin-bottom: 15px;
-            font-size: 1.2rem;
-            color: #333;
-        }
-
-        label {
-            font-weight: bold;
-            display: block;
-            margin-bottom: 5px;
-        }
-
-        input[type="text"], select {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-
-        button {
-            padding: 10px 15px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-
-        button:hover {
-            background-color: #45a049;
-        }
-
-        .url-list {
-            display: grid;
-            gap: 15px;
-        }
-
-        .url-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            background: #f9f9f9;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-
-        .url-item input {
-            flex-grow: 1;
-            margin-right: 10px;
-        }
-
-        .url-item button {
-            margin-left: 5px;
-        }
-
-        .format-results {
-            background: #f4f4f4;
-            padding: 10px;
-            border: 1px solid #ddd;
-            font-family: monospace;
-            white-space: pre-wrap;
-        }
-    </style>
+    <!-- Bootstrap CSS CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
+<body class="bg-light">
+    <div class="container mt-5">
+        <h2 class="text-center mb-4">🎬 Video Downloader</h2>
 
-    <h2>🎬 Video Downloader</h2>
-
-    <!-- Form tải video -->
-    <div class="section">
-        <h3>⬇️ Tải Video</h3>
-        <form method="POST" action="/download_format_id">
-            <label for="video-url">🔗 Link video:</label>
-            <input type="text" name="url" id="video-url" required placeholder="Nhập URL video...">
-
-            <label for="format-id">🎯 Chọn định dạng:</label>
-            <select name="format_id" id="format-id">
-                {% for fmt in formats %}
-                    <option value="{{ fmt }}">{{ fmt }}</option>
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div class="alert alert-info">
+                {% for message in messages %}
+                    <p>{{ message }}</p>
                 {% endfor %}
-            </select>
+            </div>
+        {% endif %}
+        {% endwith %}
 
-            <label>
-                <input type="checkbox" name="merge_audio" value="yes">
-                🔊 Ghép audio
-            </label>
-
-            <button type="submit">⬇️ Tải video</button>
-            <button type="button" onclick="loadFormats()">📄 Hiện định dạng cụ thể</button>
-        </form>
-        <div id="format-results" class="format-results"></div>
-    </div>
-
-    <!-- Quản lý URL -->
-    <div class="section">
-        <h3>📋 Danh sách URL đã lưu</h3>
-        <form id="add-url-form" method="POST" action="/downloads/url/add">
-            <input type="text" name="url" placeholder="Nhập URL mới" required>
-            <select name="category">
-                <option value="none" selected>None</option>
-                <option value="youtube">YouTube</option>
-                <option value="tiktok">TikTok</option>
-                <option value="facebook">Facebook</option>
-            </select>
-            <input type="text" name="title" placeholder="Tiêu đề (có thể để trống)">
-            <button type="submit">➕ Thêm URL</button>
-        </form>
-
-        <div class="url-list">
-            {% if urls %}
-                {% for item in urls %}
-                <div class="url-item" data-id="{{ item.id }}">
-                    <span>{{ item.url }}</span>
-                    <div>
-                        <button type="button" onclick="editUrl({{ item.id }})">✏️ Sửa</button>
-                        <button type="button" onclick="deleteUrl({{ item.id }})">🗑️ Xóa</button>
+        <!-- Form tải video -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h3 class="card-title mb-3">⬇️ Tải Video</h3>
+                <form method="POST" action="/download_format_id">
+                    <div class="mb-3">
+                        <label for="video-url" class="form-label">🔗 Link video:</label>
+                        <input type="text" name="url" id="video-url" class="form-control" required placeholder="Nhập URL video...">
                     </div>
-                </div>
-                {% endfor %}
-            {% else %}
-                <p>Chưa có URL nào trong danh sách.</p>
-            {% endif %}
+                    
+                    <div class="mb-3">
+                        <label for="format-id" class="form-label">🎯 Chọn định dạng:</label>
+                        <select name="format_id" id="format-id" class="form-select">
+                            {% for fmt in formats %}
+                                <option value="{{ fmt }}">{{ fmt }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input type="checkbox" name="merge_audio" value="yes" class="form-check-input" id="merge_audio">
+                        <label class="form-check-label" for="merge_audio">🔊 Ghép audio</label>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">⬇️ Tải video</button>
+                        <button type="button" class="btn btn-secondary" onclick="loadFormats()">📄 Hiện định dạng cụ thể</button>
+                    </div>
+
+                    <div id="format-results" class="mt-3"></div>
+                </form>
+            </div>
         </div>
+
+<!-- Quản lý URL -->
+<div class="card mb-4">
+    <div class="card-body">
+        <h3 class="card-title mb-3">📋 Danh sách URL đã lưu trong hệ thống</h3>
+        {% if urls %}
+        <form id="bulk-download-form" method="POST" action="/downloads/batch/download">
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered">
+                    <thead class="table-dark">
+                        <tr>
+                            <th><input type="checkbox" id="select-all" onclick="toggleSelectAll(this)"></th>
+                            <th>ID</th>
+                            <th>🔗 URL</th>
+                            <th>📂 Loại</th>
+                            <th>⚙️ Trạng thái</th>
+                            <th>🎞️ Tiêu đề</th>
+                            <th>🖼 Tỷ lệ</th>
+                            <th>🕒 Tạo lúc</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in urls %}
+                        <tr>
+                            <td><input type="checkbox" name="selected_urls" value="{{ item.id }}"></td>
+                            <td>{{ item.id }}</td>
+                            <td><a href="{{ item.url }}" target="_blank">{{ item.url }}</a></td>
+                            <td>{{ item.category }}</td>
+                            <td>
+                                {% if item.status == "pending" %}
+                                    <span class="badge bg-warning text-dark">⏳ Đang xử lý</span>
+                                {% elif item.status == "completed" %}
+                                    <span class="badge bg-success">✅ Hoàn thành</span>
+                                {% elif item.status == "failed" %}
+                                    <span class="badge bg-danger">❌ Thất bại</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">⚪ Chưa xác định</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ item.title or '' }}</td>
+                            <td>{{ item.ratio or '' }}</td>
+                            <td>{{ item.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center">
+                    {% if page > 1 %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page - 1 }}&per_page={{ per_page }}">Trang trước</a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for p in range(1, total_pages + 1) %}
+                    <li class="page-item {% if p == page %}active{% endif %}">
+                        <a class="page-link" href="?page={{ p }}&per_page={{ per_page }}">{{ p }}</a>
+                    </li>
+                    {% endfor %}
+
+                    {% if page < total_pages %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page + 1 }}&per_page={{ per_page }}">Trang sau</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+
+            <!-- Nút tải các video đã chọn -->
+            <div class="text-center mt-3">
+                <button type="submit" class="btn btn-primary">⬇️ Tải các video đã chọn</button>
+            </div>
+        </form>
+        {% else %}
+            <p class="text-muted">Chưa có URL nào được lưu trong hệ thống.</p>
+        {% endif %}
+    </div>
+</div>
     </div>
 
+    <!-- Bootstrap JS and Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function loadFormats() {
             const url = document.getElementById('video-url').value.trim();
-            if (!url) {
-                alert("Vui lòng nhập URL video trước.");
-                return;
-            }
+            if (!url) return alert("Vui lòng nhập URL video trước.");
 
             fetch('/formats', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: new URLSearchParams({ 'url': url })
-            })
-            .then(response => response.json())
-            .then(data => {
-                const resultDiv = document.getElementById('format-results');
-                if (data.error) {
-                    resultDiv.innerHTML = '<b>❌ Lỗi:</b> ' + data.error;
-                } else {
-                    resultDiv.innerHTML = `<b>🎞 Các định dạng có sẵn:</b><pre>${JSON.stringify(data.formats, null, 2)}</pre>`;
-                }
+            }).then(res => res.json()).then(data => {
+                document.getElementById('format-results').innerHTML = data.error 
+                    ? `<div class="alert alert-danger">❌ ${data.error}</div>`
+                    : `<div class="alert alert-info"><b>🎞 Các định dạng có sẵn:</b><pre>${JSON.stringify(data.formats, null, 2)}</pre></div>`;
             });
         }
 
-        function deleteUrl(id) {
-            if (!confirm(`Bạn có chắc muốn xóa URL này?`)) return;
+        function toggleSelectAll(masterCheckbox) {
+            document.querySelectorAll('input[name="selected_urls"]').forEach(cb => cb.checked = masterCheckbox.checked);
+        }
 
-            fetch('/url/delete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: id })
-            }).then(() => location.reload());
+        function updatePerPage(perPage) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('per_page', perPage);
+            url.searchParams.set('page', 1);
+            window.location.href = url;
         }
     </script>
 </body>

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Danh sách Video</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            max-width: 900px;
+            margin: auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        .settings-popup {
+            display: none;
+            position: absolute;
+            top: 20px;
+            right: 10px;
+            background: #fff;
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 6px;
+            box-shadow: 0 0 10px #aaa;
+            z-index: 100;
+            width: 280px;
+        }
+        .settings-popup.active {
+            display: block;
+        }
+    </style>
+    <script>
+        function toggleSettings(id) {
+            const popup = document.getElementById("settings_" + id);
+            popup.classList.toggle("active");
+        }
+        function toggleNote() {
+            const popup = document.getElementById("global-note");
+            popup.classList.toggle("active");
+        }
+
+        document.addEventListener('click', function(event) {
+            const note = document.getElementById("global-note");
+            const button = event.target.closest("button");
+
+            if (!note.contains(event.target) && (!button || !button.onclick || button.onclick.toString().indexOf('toggleNote') === -1)) {
+                note.classList.remove("active");
+            }
+        });
+    </script>
+</head>
+<body>
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div class="alert alert-info">
+        {% for message in messages %}
+        <p>{{ message }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <h1 class="mb-4">📼 Danh sách Video</h1>
+
+    <div class="mb-3">
+        <a href="{{ url_for('trends.google_trends') }}" class="btn btn-primary me-2">🌐 Xem Google Trends</a>
+        <button class="btn btn-secondary" onclick="toggleNote()">❓ Giải thích tham số xuất video</button>
+    </div>
+
+    <div id="global-note" class="settings-popup" style="right: auto; left: 50%; transform: translateX(-50%); top: 100px;">
+        <strong>📝 Giải thích tham số xuất video:</strong>
+        <ul style="padding-left: 18px; font-size: 14px;">
+            <li><strong>fps</strong>: Số khung hình mỗi giây (thường dùng 24 hoặc 30).</li>
+            <li><strong>codec</strong>: Bộ mã hóa video (ví dụ <code>libx264</code> - chuẩn H.264).</li>
+            <li><strong>bitrate</strong>: Chất lượng video tính theo kbps. VD: <code>3000k</code> = 3Mbps.</li>
+            <li><strong>preset</strong>: Tốc độ mã hóa (càng chậm chất lượng càng cao): <code>fast</code>, <code>medium</code>, <code>slow</code>...</li>
+            <li><strong>audio_codec</strong>: Bộ mã hóa âm thanh (<code>aac</code> hoặc <code>libmp3lame</code>).</li>
+            <li><strong>audio_bitrate</strong>: Chất lượng âm thanh (thường <code>128k</code> đến <code>192k</code>).</li>
+            <button type="button" class="btn-close float-end" aria-label="Close" onclick="toggleNote()"></button>
+        </ul>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div class="alert alert-success">
+        {% for message in messages %}
+        <p>{{ message }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <a href="{{ url_for('video.create_video') }}" class="btn btn-success mb-4">+ Tạo Video Mới</a>
+
+    {% for video in videos %}
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body position-relative">
+            <h2 class="card-title h5">{{ video.title }}</h2>
+            <p><strong>ID:</strong> {{ video.id }}</p>
+            <p><strong>Ngày tạo:</strong> {{ video.created_at.strftime("%d/%m/%Y %H:%M") if video.created_at else 'Chưa có' }}</p>
+
+            <a href="{{ url_for('video.video_detail', video_id=video.id) }}" class="btn btn-primary me-2">Xem Chi Tiết</a>
+            <a href="{{ url_for('video.edit_video', video_id=video.id) }}" class="btn btn-success me-2">Sửa</a>
+
+            <div class="export-section mt-3 p-3 bg-light rounded">
+                <form action="{{ url_for('video.export_video', video_id=video.id) }}" method="GET" class="row g-3 align-items-center">
+                    <div class="col-md-4">
+                        <label for="lang_{{ video.id }}" class="form-label">Ngôn ngữ:</label>
+                        <select name="lang" id="lang_{{ video.id }}" class="form-select">
+                            {% for code, name in languages.items() %}
+                            <option value="{{ code }}">{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label for="ratio_{{ video.id }}" class="form-label">Tỉ lệ video:</label>
+                        <select name="ratio" id="ratio_{{ video.id }}" class="form-select">
+                            <option value="horizontal">🎬 16:9 (YouTube)</option>
+                            <option value="vertical">📱 9:16 (TikTok, Shorts)</option>
+                            <option value="square">⬛ 1:1 (Instagram)</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label for="voice_{{ video.id }}" class="form-label">Giọng:</label>
+                        <select name="voice" id="voice_{{ video.id }}" class="form-select">
+                            <option value="default">Mặc định</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12">
+                        <button type="button" class="btn btn-success" onclick="toggleSettings({{ video.id }})">⚙ Cài Đặt</button>
+                    </div>
+
+                    <div id="settings_{{ video.id }}" class="settings-popup">
+                        <div class="mb-3">
+                            <label class="form-label">Codec:</label>
+                            <select name="codec" class="form-select">
+                                <option value="libx264" selected>libx264</option>
+                                <option value="libx265">libx265</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Bitrate:</label>
+                            <input type="text" name="bitrate" value="8000k" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Preset:</label>
+                            <select name="preset" class="form-select">
+                                <option value="ultrafast">ultrafast</option>
+                                <option value="superfast">superfast</option>
+                                <option value="veryfast">veryfast</option>
+                                <option value="faster">faster</option>
+                                <option value="fast">fast</option>
+                                <option value="medium" selected>medium</option>
+                                <option value="slow">slow</option>
+                                <option value="slower">slower</option>
+                                <option value="veryslow">veryslow</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Audio codec:</label>
+                            <select name="audio_codec" class="form-select">
+                                <option value="aac" selected>AAC</option>
+                                <option value="libmp3lame">MP3</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Audio bitrate:</label>
+                            <input type="text" name="audio_bitrate" value="192k" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-purple btn-primary">🎞 Export Video</button>
+                    </div>
+                </form>
+            </div>
+
+            <form action="{{ url_for('video.delete_video', video_id=video.id) }}" method="POST" style="display:inline;">
+                <button type="submit" class="btn btn-danger mt-3" onclick="return confirm('Bạn có chắc muốn xoá video này không?');">🗑 Xoá</button>
+            </form>
+        </div>
+    </div>
+    {% else %}
+    <p>Chưa có video nào.</p>
+    {% endfor %}
+
+    <!-- Bootstrap JS + Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
