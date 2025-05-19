@@ -146,7 +146,7 @@
                         {% for img in segment.images|sort(attribute='order_index') %}
                         <li>
                             <img src="{{ url_for('static', filename=img.file_path.split('static/')[-1]) }}" alt="Image" />
-                            <a href="{{ url_for('delete_image', image_id=img.id) }}" onclick="return confirm('Xóa ảnh này?')">Xóa ảnh</a>
+                            <a href="{{ url_for('video.delete_image', image_id=img.id) }}" onclick="return confirm('Xóa ảnh này?')">Xóa ảnh</a>
                         </li>
                         {% endfor %}
                     </ul>
@@ -157,7 +157,7 @@
         <button type="button" onclick="addSegment()">+ Thêm đoạn</button><br /><br />
 
         <button type="submit">Lưu thay đổi</button>
-        <a href="{{ url_for('video_detail', video_id=video.id) }}" class="button-link">Hủy</a>
+        <a href="{{ url_for('video.video_detail', video_id=video.id) }}" class="button-link">Hủy</a>
     </form>
 
 <script>

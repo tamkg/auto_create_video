@@ -38,7 +38,7 @@
     </style>
 </head>
 <body>
-    <a href="{{ url_for('index') }}" class="btn-back">&larr; Quay lại danh sách</a>
+    <a href="{{ url_for('video.index') }}" class="btn-back">&larr; Quay lại danh sách</a>
     <h1>{{ video.title }}</h1>
 
     {% for segment in video.segments|sort(attribute='order_index') %}

@@ -10,8 +10,7 @@ from extensions import db, basedir
 from models import Video, Segment, Image  # Giả sử model nằm trong models.py
 from gtts.lang import tts_langs
 import logging
-from concurrent.futures import ThreadPoolExecutor
-from flask import jsonify
+
 
 video_bp = Blueprint('video', __name__, template_folder="templates")
 

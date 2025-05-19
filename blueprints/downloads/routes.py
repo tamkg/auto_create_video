@@ -46,15 +46,20 @@ def index():
     urls = pagination.items  # Danh sách URL của trang hiện tại
     total_pages = pagination.pages
 
+    # Tính toán start_page và end_page cho việc phân trang
+    start_page = max(1, page - 2)
+    end_page = min(total_pages, page + 2)
+
     return render_template(
         'downloads/downloads.html',
         formats=formats,
         urls=urls,
         page=page,
         per_page=per_page,
-        total_pages=total_pages
+        total_pages=total_pages,
+        start_page=start_page,
+        end_page=end_page
     )
-
 
 @download_bp.route('/download_format_id', methods=['POST'])
 def download_format_id():
