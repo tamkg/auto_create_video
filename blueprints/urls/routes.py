@@ -231,4 +231,78 @@ def delete_url():
     db.session.commit()
     return json_response(True, "✅ Đã xóa URL thành công.")
 
+@url_manager_bp.route('/fetch_tiktok_videos', methods=['POST'])
+def fetch_tiktok_videos():
+    data = request.get_json()
+    url = data.get('url', '').strip()
 
+    if not url or not is_valid_url(url):
+        return json_response(False, "❌ URL không hợp lệ.", status=400)
+
+    try:
+        ydl_opts = {
+            'quiet': True,
+            'skip_download': True,
+            'extract_flat': True,
+            'force_generic_extractor': True,  # Đảm bảo TikTok được lấy qua extractor tổng quát
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            if info.get('_type') == 'playlist' or info.get('entries'):
+                videos = [entry.get('url') or entry.get('id') for entry in info.get('entries', [])]
+                return json_response(True, "✅ Đã lấy danh sách video từ kênh TikTok.", data={'videos': videos})
+
+            return json_response(False, "❌ Không tìm thấy video nào trong kênh TikTok.")
+    except Exception as e:
+        return json_response(False, f"❌ Không thể lấy video từ kênh TikTok. Lỗi: {str(e)}", status=500)
+
+@url_manager_bp.route('/add_batch', methods=['POST'])
+def add_batch_urls():
+    data = request.get_json()
+    urls = data.get('urls', [])
+    category = data.get('category', 'none').strip()
+    
+    if not urls:
+        return json_response(False, "❌ Không có URL nào để thêm.", 400)
+
+    added_count = 0
+    existing_urls = {url.url for url in DownloadUrl.query.filter(DownloadUrl.url.in_(urls)).all()}
+    new_urls = []
+
+    for url in urls:
+        if not is_valid_url(url) or url in existing_urls:
+            continue
+        
+        try:
+            # Lấy thông tin chi tiết video để lấy tỷ lệ khung hình (nếu có)
+            ydl_opts = {'quiet': True, 'skip_download': True}
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                title = info.get('title', 'Không tìm thấy tiêu đề')
+                width = info.get('width')
+                height = info.get('height')
+                ratio = f"{width}:{height}" if width and height else "Không xác định"
+        except:
+            title = 'Không tìm thấy tiêu đề'
+            ratio = 'Không xác định'
+
+        new_urls.append(DownloadUrl(
+            url=url,
+            title=title,
+            category=category,
+            status='pending',
+            ratio=ratio
+        ))
+        added_count += 1
+
+    if new_urls:
+        try:
+            with db.session.no_autoflush:
+                db.session.add_all(new_urls)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return json_response(False, f"❌ Đã xảy ra lỗi khi thêm video: {str(e)}", 500)
+    
+    return json_response(True, f"✅ Đã thêm {added_count} video vào database.", data={'added': added_count})
