@@ -8,6 +8,7 @@ from blueprints.trends.routes import trends_bp
 from blueprints.downloads.routes import download_bp
 from blueprints.urls.routes import url_manager_bp
 from blueprints.create_videos.routes import video_bp
+from blueprints.audio_tools.routes import audio_tools_bp
 
 import os
 import logging
@@ -42,6 +43,7 @@ def create_app():
     app.register_blueprint(download_bp, url_prefix='/downloads')
     app.register_blueprint(url_manager_bp, url_prefix='/url')
     app.register_blueprint(video_bp, url_prefix='/create_video')
+    app.register_blueprint(audio_tools_bp, url_prefix='/audio')
 
     with app.app_context():
         db.create_all()

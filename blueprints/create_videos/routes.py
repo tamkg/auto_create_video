@@ -10,7 +10,7 @@ from extensions import db, basedir
 from models import Video, Segment, Image  # Giả sử model nằm trong models.py
 from gtts.lang import tts_langs
 import logging
-
+from flask import current_app
 
 video_bp = Blueprint('video', __name__, template_folder="templates")
 
@@ -46,7 +46,7 @@ def create_video():
                     for file in files:
                         if file and file.filename != '':
                             filename = secure_filename(file.filename)
-                            filepath = os.path.join(video_bp.config['UPLOAD_FOLDER'], filename)
+                            filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
                             file.save(filepath)
 
                             order_img += 1
@@ -121,7 +121,8 @@ def edit_video(video_id):
                 for i, file in enumerate(files):
                     if file and file.filename != '':
                         filename = secure_filename(file.filename)
-                        filepath = os.path.join(video_bp.config['UPLOAD_FOLDER'], filename)
+                        filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+
                         file.save(filepath)
                         image = Image(
                             segment_id=segment.id,

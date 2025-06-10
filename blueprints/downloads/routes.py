@@ -81,7 +81,7 @@ def download_format_id():
 
     ydl_opts = {
         'format': format_str,
-        'outtmpl': os.path.join(output_path, safe_filename('%(title)s.%(ext)s')),
+        'outtmpl': os.path.join(output_path, '%(title).100s.%(ext)s'),  # Giới hạn độ dài tiêu đề
         'quiet': False,
         'cookies': cookies_file,
     }
@@ -147,7 +147,7 @@ def batch_download():
 
             ydl_opts = {
                 'format': format_str,
-                'outtmpl': os.path.join(output_path, safe_filename('%(title)s.%(ext)s')),
+                'outtmpl': os.path.join(output_path, '%(id)s.%(ext)s'),
                 'quiet': False,
                 'merge_output_format': 'mp4',
                 'cookies': cookies_file,
@@ -212,20 +212,22 @@ def get_formats():
             formats = info.get('formats', [])
             format_list = []
             for f in formats:
-                format_id = f.get('format_id')
-                ext = f.get('ext')
-                resolution = f.get('resolution') or f.get('height')
-                abr = f.get('abr') or ''
-                filesize = f.get('filesize') or ''
                 format_list.append({
-                    'id': format_id,
-                    'info': f"{format_id} | {ext} | {resolution} | {abr}kdownload_bps | {filesize}"
+                    'id': f.get('format_id'),
+                    'ext': f.get('ext'),
+                    'resolution': f.get('resolution') or f.get('height'),
+                    'abr': f.get('abr'),
+                    'filesize': f.get('filesize'),
+                    'vcodec': f.get('vcodec'),
+                    'acodec': f.get('acodec')
                 })
-            return {'formats': format_list}
+            # Trả thêm title
+            title = info.get('title', '')
+
+            return {'formats': format_list, 'title': title}
     except Exception as e:
         logging.error(f"Error fetching formats: {e}")
         return {'error': str(e)}, 500
-
 
 
 @download_bp.route('/batch/download', methods=['POST'])
@@ -287,7 +289,7 @@ def batch_download_selected():
 
             ydl_opts = {
                 'format': format_str,
-                'outtmpl': os.path.join(output_path, safe_filename('%(title)s.%(ext)s')),
+                'outtmpl': os.path.join(output_path, '%(id)s.%(ext)s'),
                 'quiet': False,
                 'merge_output_format': 'mp4',
                 'cookies': cookies_file,
@@ -323,3 +325,35 @@ def batch_download_selected():
 
     return redirect('/downloads')
 
+@download_bp.route('/download_format_only', methods=['POST'])
+def download_format_only():
+    url = request.form.get('url')
+    format_id = request.form.get('format_id')
+
+    if not url or not format_id:
+        flash("❗ Thiếu URL hoặc định dạng.")
+        return redirect('/')
+
+    cookies_file = 'cookies.txt'
+    output_path = current_app.config.get('OUTPUT_PATH')
+
+    if not os.path.exists(cookies_file):
+        flash("❗ Không tìm thấy file cookies.txt. Vui lòng xuất cookies từ trình duyệt.")
+        return redirect('/')
+
+    ydl_opts = {
+        'format': format_id,
+        'outtmpl': os.path.join(output_path, '%(title).100s.%(ext)s'),
+        'quiet': False,
+        'cookies': cookies_file,
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+        flash(f"✅ Đã tải thành công định dạng {format_id}")
+    except Exception as e:
+        flash(f"❌ Lỗi khi tải: {e}")
+        logging.error(f"Error downloading format only: {e}")
+
+    return redirect('/')

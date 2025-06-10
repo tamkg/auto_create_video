@@ -51,6 +51,7 @@
                     <div class="mb-3">
                         <label for="video-url" class="form-label">🔗 Link video:</label>
                         <input type="text" name="url" id="video-url" class="form-control" required placeholder="Nhập URL video...">
+                        <div id="video-title" class="mb-3 fw-bold" style="font-size: 1.2rem; color: #333;"></div>
                     </div>
                     
                     <div class="mb-3">
@@ -182,20 +183,74 @@
     <!-- Bootstrap JS and Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        function loadFormats() {
-            const url = document.getElementById('video-url').value.trim();
-            if (!url) return alert("Vui lòng nhập URL video trước.");
+function loadFormats() {
+    const url = document.getElementById('video-url').value.trim();
+    if (!url) return alert("Vui lòng nhập URL video trước.");
 
-            fetch('/formats', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({ 'url': url })
-            }).then(res => res.json()).then(data => {
-                document.getElementById('format-results').innerHTML = data.error 
-                    ? `<div class="alert alert-danger">❌ ${data.error}</div>`
-                    : `<div class="alert alert-info"><b>🎞 Các định dạng có sẵn:</b><pre>${JSON.stringify(data.formats, null, 2)}</pre></div>`;
-            });
+    fetch('/downloads/formats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ 'url': url })
+    }).then(res => res.json()).then(data => {
+        if (data.error) {
+            document.getElementById('format-results').innerHTML = `<div class="alert alert-danger">❌ ${data.error}</div>`;
+            document.getElementById('video-title').innerText = '';
+        } else {
+            // Hiển thị tiêu đề video
+            document.getElementById('video-title').innerText = data.title || '';
+            document.getElementById('format-results').innerHTML = generateFormatTable(data.formats);
         }
+    });
+}
+
+
+function generateFormatTable(formats) {
+    let table = `
+        <div class="table-responsive">
+            <table class="table table-bordered table-sm table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Loại</th>
+                        <th>Độ phân giải</th>
+                        <th>Bitrate</th>
+                        <th>Dung lượng</th>
+                        <th>Định dạng</th>
+                        <th>Tải xuống</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    for (const f of formats) {
+        const isVideo = f.vcodec !== 'none';
+        table += `
+            <tr>
+                <td>${f.id}</td>
+                <td>${isVideo ? '📹 Video' : (f.acodec !== 'none' ? '🔊 Audio' : 'Khác')}</td>
+                <td>${f.resolution || f.height || '-'}</td>
+                <td>${f.abr || '-'}</td>
+                <td>${f.filesize ? (f.filesize / (1024 * 1024)).toFixed(1) + ' MB' : '-'}</td>
+                <td>${f.ext}</td>
+                <td>
+                    <form method="POST" action="/downloads/download_format_only" style="margin:0;">
+                        <input type="hidden" name="url" value="${document.getElementById('video-url').value}">
+                        <input type="hidden" name="format_id" value="${f.id}">
+                        <button type="submit" class="btn btn-sm btn-success">⬇️</button>
+                    </form>
+                </td>
+            </tr>
+        `;
+    }
+
+    table += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    return table;
+}
+
 
         function toggleSelectAll(masterCheckbox) {
             document.querySelectorAll('input[name="selected_urls"]').forEach(cb => cb.checked = masterCheckbox.checked);
