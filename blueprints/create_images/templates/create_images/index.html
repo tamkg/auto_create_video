@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Trình Xử Lý Ảnh Đa Chức Năng{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">🧠 Trình Xử Lý Ảnh</h2>
+
+    <form method="POST" enctype="multipart/form-data" class="card p-4 shadow-sm">
+        <!-- 1. Chọn chế độ -->
+        <div class="mb-3">
+            <label for="mode" class="form-label">🧰 Chọn chức năng:</label>
+            <select name="mode" id="mode" class="form-select" required onchange="onModeChange(this.value)">
+                <option value="" disabled selected>-- Chọn một chức năng --</option>
+                <option value="text2image">✍️ Văn bản → Ảnh</option>
+                <option value="edit">🛠️ Chỉnh sửa ảnh</option>
+                <option value="transform">🔄 Biến đổi ảnh</option>
+            </select>
+        </div>
+
+        <!-- 2. Engine (tùy vào mode) -->
+        <div class="mb-3">
+            <label for="tool" class="form-label">⚙️ Công cụ:</label>
+            <select name="tool" id="tool" class="form-select" required>
+                <!-- Sẽ cập nhật qua JS tương ứng với mode -->
+            </select>
+        </div>
+
+        <!-- 3. Input khác tùy theo chế độ -->
+        <div id="mode-inputs">
+            <!-- placeholder cho phần input động -->
+        </div>
+
+        <button type="submit" class="btn btn-primary">🚀 Xử lý</button>
+    </form>
+
+    {% if generated_image_url %}
+    <div class="mt-5">
+        <h4>✅ Kết quả:</h4>
+        <img src="{{ generated_image_url }}" alt="Ảnh đã tạo" class="img-fluid border rounded shadow-sm">
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function onModeChange(mode) {
+    const toolSelect = document.getElementById("tool");
+    const inputArea = document.getElementById("mode-inputs");
+
+    // Reset
+    toolSelect.innerHTML = '';
+    inputArea.innerHTML = '';
+
+if (mode === "text2image") {
+    toolSelect.innerHTML = `
+        <option value="stability">🌌 Stable Diffusion (Stability.ai)</option>
+        <option value="gan">🤖 StyleGAN</option>
+    `;
+    inputArea.innerHTML = `
+        <div class="mb-3">
+            <label for="description" class="form-label">📝 Mô tả:</label>
+            <textarea class="form-control" name="description" rows="4" placeholder="Ví dụ: Một con rồng trên mặt trăng" required></textarea>
+            <small class="text-muted">⚠️ Mô tả chỉ hỗ trợ tiếng Anh (ví dụ: "a dragon flying over the moon")</small>
+
+        </div>
+    `;
+} else if (mode === "edit") {
+        toolSelect.innerHTML = `
+            <option value="pillow">🧵 Pillow</option>
+            <option value="opencv">📷 OpenCV</option>
+        `;
+        inputArea.innerHTML = `
+            <div class="mb-3">
+                <label for="image" class="form-label">📤 Tải ảnh lên:</label>
+                <input type="file" name="image" class="form-control" accept="image/*" required>
+            </div>
+            <div class="mb-3">
+                <label for="edit_action" class="form-label">✂️ Hành động:</label>
+                <select name="edit_action" class="form-select">
+                    <option value="grayscale">Làm đen trắng</option>
+                    <option value="blur">Làm mờ</option>
+                    <option value="invert">Đảo màu</option>
+                </select>
+            </div>
+        `;
+    } else if (mode === "transform") {
+        toolSelect.innerHTML = `
+            <option value="matplotlib">📊 Matplotlib</option>
+            <option value="scikit">🧪 Scikit-Image</option>
+        `;
+        inputArea.innerHTML = `
+            <div class="mb-3">
+                <label class="form-label">💡 Biến đổi mẫu:</label>
+                <input type="text" name="transform_param" class="form-control" placeholder="Ví dụ: sin(x) * cos(y)">
+            </div>
+        `;
+    }
+}
+</script>
+{% endblock %}

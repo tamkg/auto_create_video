@@ -9,6 +9,7 @@ from blueprints.downloads.routes import download_bp
 from blueprints.urls.routes import url_manager_bp
 from blueprints.create_videos.routes import video_bp
 from blueprints.audio_tools.routes import audio_tools_bp
+from blueprints.create_images.routes import create_images_bp
 
 import os
 import logging
@@ -34,7 +35,7 @@ def create_app():
     db.init_app(app)
     migrate = Migrate(app, db)
 
-    @app.route("/")
+    @app.route("/", endpoint="index")
     def homepage():
         return render_template('index.html')
 
@@ -44,6 +45,7 @@ def create_app():
     app.register_blueprint(url_manager_bp, url_prefix='/url')
     app.register_blueprint(video_bp, url_prefix='/create_video')
     app.register_blueprint(audio_tools_bp, url_prefix='/audio')
+    app.register_blueprint(create_images_bp, url_prefix='/create_images')
 
     with app.app_context():
         db.create_all()
