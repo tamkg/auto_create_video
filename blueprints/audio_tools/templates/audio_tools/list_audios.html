@@ -1,22 +1,26 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>📂 Danh sách Media</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+
     <!-- Plyr CSS -->
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <style>
         video, audio {
             width: 100%;
             max-height: 360px;
+            height: auto; /* luôn tự động theo tỉ lệ */
+            display: block;
+            margin: 0 auto;
         }
-        video.plyr__video-embed,
-        video.plyr__video {
-        width: 100%;
-        height: auto; /* nhưng JS sẽ override chiều cao đúng tỉ lệ */
+        .plyr__video-wrapper {
+            width: 100%;
+            max-width: 720px; /* hoặc chỉnh max-width tuỳ ý */
+            margin: 0 auto;
         }
+        
     </style>
 </head>
 <body class="bg-light">
@@ -28,9 +32,9 @@
         <ul class="list-group mb-4">
             {% for file in audio_files %}
                 <li class="list-group-item">
-                    <strong>{{ file }}</strong><br>
+                    <strong>{{ file }}</strong><br />
                     <audio class="plyr" controls>
-                        <source src="{{ url_for('audio_tools.serve_media', media_type='audio', filename=file) }}">
+                        <source src="{{ url_for('audio_tools.serve_media', media_type='audio', filename=file) }}" />
                     </audio>
                     <div class="mt-2">
                         <a href="{{ url_for('audio_tools.serve_media', media_type='audio', filename=file) }}" class="btn btn-sm btn-success" download>⬇️ Tải</a>
@@ -45,14 +49,12 @@
         <ul class="list-group">
             {% for file in video_files %}
                 <li class="list-group-item">
-                    <strong>{{ file }}</strong><br>
+                    <strong>{{ file }}</strong><br />
                     <video class="plyr" controls>
-                        <source src="{{ url_for('audio_tools.serve_media', media_type='video', filename=file) }}">
-                        
-                        {# Nếu bạn có phụ đề .vtt cùng tên file thì có thể thêm đoạn sau: #}
+                        <source src="{{ url_for('audio_tools.serve_media', media_type='video', filename=file) }}" />
                         {% set base = file.rsplit('.', 1)[0] %}
                         {% if base ~ '.vtt' in subtitle_files %}
-                            <track kind="subtitles" src="{{ url_for('audio_tools.serve_media', media_type='subtitle', filename=base ~ '.vtt') }}" srclang="vi" label="Tiếng Việt" default>
+                            <track kind="subtitles" src="{{ url_for('audio_tools.serve_media', media_type='subtitle', filename=base ~ '.vtt') }}" srclang="vi" label="Tiếng Việt" default />
                         {% endif %}
                     </video>
                     <div class="mt-2">
@@ -104,28 +106,15 @@
         },
         clickToPlay: true,
         previewThumbnails: {
-            enabled: true,  // Nếu bạn cấu hình ảnh thumbnail riêng
+            enabled: true,
         },
         fullscreen: {
             enabled: true,
             fallback: true,
             iosNative: false
         },
-        // ratio: '16:9',
+        // Không set ratio cứng, để Plyr tự xử lý
     });
-});
-
-  players.forEach(player => {
-    const video = player.elements.container.querySelector('video');
-    if (video) {
-      video.addEventListener('loadedmetadata', () => {
-        const aspectRatio = video.videoWidth / video.videoHeight;
-        const width = video.clientWidth;
-        const height = width / aspectRatio;
-        video.style.height = `${height}px`;
-        player.elements.container.style.height = `${height}px`;
-      });
-    }
   });
 </script>
 </body>
