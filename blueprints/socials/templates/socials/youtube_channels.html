@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Kênh YouTube Đã Kết Nối{% endblock %}
+
+{% block content %}
+<h2 class="text-center mb-4">📺 Kênh YouTube Đã Kết Nối</h2>
+
+<!-- Nút mở popup -->
+<div class="mb-3 text-end">
+    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#connectModal">
+        🔗 Kết nối kênh mới
+    </button>
+</div>
+
+<!-- Danh sách kênh -->
+<div class="row g-4">
+    {% for channel in channels %}
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+<div class="card-body text-center">
+    <img src="{{ channel.thumbnail_url }}" class="rounded-circle mb-3" width="80" height="80">
+    <h5 class="card-title">{{ channel.title }}</h5>
+    <p class="text-muted small">ID: {{ channel.channel_id }}</p>
+
+    <!-- Thêm thông tin chi tiết -->
+    <ul class="list-unstyled mb-2 small text-start">
+        <li><strong>👥 Sub:</strong> {{ channel.subscribers | default('N/A') }}</li>
+        <li><strong>👁️ Views:</strong> {{ channel.views | default('N/A') }}</li>
+        <li><strong>🌍 Quốc gia:</strong> {{ channel.country | default('Không rõ') }}</li>
+        <li><strong>📅 Tạo:</strong>
+            {{ channel.published_at[:10] if channel.published_at else 'Không rõ' }}
+        </li>
+    </ul>
+
+    <a href="#" class="btn btn-primary btn-sm">📤 Quản Lý Đăng video</a>
+    <form method="POST" action="{{ url_for('social.delete_youtube_channel', channel_id=channel.channel_id) }}" onsubmit="return confirm('Bạn có chắc muốn xoá kênh này?');">
+        <button type="submit" class="btn btn-outline-danger btn-sm mt-2">❌ Gỡ kênh</button>
+    </form>
+</div>
+
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Modal Popup -->
+<div class="modal fade" id="connectModal" tabindex="-1" aria-labelledby="connectModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('social.connect_youtube_form') }}" enctype="multipart/form-data">
+        <div class="modal-header">
+          <h5 class="modal-title" id="connectModalLabel">🔗 Kết nối kênh YouTube mới</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Lựa chọn phương thức kết nối -->
+          <div class="mb-3">
+            <label class="form-label">Chọn cách kết nối:</label>
+            <select class="form-select" id="authMethod" name="auth_method" required onchange="toggleAuthMethod()">
+              <option value="manual">🔑 Nhập Client ID & Secret</option>
+              <option value="file">📁 Upload file JSON</option>
+            </select>
+          </div>
+
+          <!-- Nhập thủ công -->
+          <div id="manualFields">
+            <div class="mb-3">
+                <label for="client_id" class="form-label">Client ID</label>
+                <input type="text" class="form-control" id="client_id" name="client_id">
+            </div>
+            <div class="mb-3">
+                <label for="client_secret" class="form-label">Client Secret</label>
+                <input type="text" class="form-control" id="client_secret" name="client_secret">
+            </div>
+          </div>
+
+          <!-- Upload file -->
+          <div id="fileField" class="d-none">
+            <div class="mb-3">
+                <label for="client_file" class="form-label">Chọn file client_secret.json</label>
+                <input type="file" class="form-control" id="client_file" name="client_file" accept=".json">
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+          <button type="submit" class="btn btn-primary">Bắt đầu kết nối</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleAuthMethod() {
+    const method = document.getElementById("authMethod").value;
+    document.getElementById("manualFields").classList.toggle("d-none", method !== "manual");
+    document.getElementById("fileField").classList.toggle("d-none", method !== "file");
+}
+</script>
+{% endblock %}

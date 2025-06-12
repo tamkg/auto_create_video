@@ -10,6 +10,7 @@ from blueprints.urls.routes import url_manager_bp
 from blueprints.create_videos.routes import video_bp
 from blueprints.audio_tools.routes import audio_tools_bp
 from blueprints.create_images.routes import create_images_bp
+from blueprints.socials.routes import social_bp
 
 import os
 import logging
@@ -46,6 +47,7 @@ def create_app():
     app.register_blueprint(video_bp, url_prefix='/create_video')
     app.register_blueprint(audio_tools_bp, url_prefix='/audio')
     app.register_blueprint(create_images_bp, url_prefix='/create_images')
+    app.register_blueprint(social_bp, url_prefix='/social')
 
     with app.app_context():
         db.create_all()
@@ -55,4 +57,4 @@ def create_app():
 
 if __name__ == "__main__":
     app = create_app()
-    app.run(host="0.0.0.0", debug=True, port=5678)
+    app.run(host="0.0.0.0", debug=True, port=5000)
