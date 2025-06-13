@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2>Cập nhật Model Config</h2>
+  <form method="POST">
+    <div class="mb-3">
+      <label class="form-label">Provider</label>
+      <input type="text" class="form-control" name="provider" value="{{ model.provider }}" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Model Name</label>
+      <input type="text" class="form-control" name="model_name" value="{{ model.model_name }}" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Endpoint</label>
+      <input type="text" class="form-control" name="endpoint" value="{{ model.endpoint }}">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">API Key</label>
+      <input type="text" class="form-control" name="api_key" value="{{ model.api_key }}">
+    </div>
+    <div class="form-check mb-3">
+      <input class="form-check-input" type="checkbox" name="active" id="active" {% if model.active %}checked{% endif %}>
+      <label class="form-check-label" for="active">Kích hoạt</label>
+    </div>
+    <button type="submit" class="btn btn-primary">Lưu</button>
+    <a href="{{ url_for('setup_video_prompt.index') }}" class="btn btn-secondary">Huỷ</a>
+  </form>
+</div>
+{% endblock %}

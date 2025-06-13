@@ -11,6 +11,11 @@ from blueprints.create_videos.routes import video_bp
 from blueprints.audio_tools.routes import audio_tools_bp
 from blueprints.create_images.routes import create_images_bp
 from blueprints.socials.routes import social_bp
+from blueprints.setup_video_prompt.routes import setup_video_prompt_bp
+
+
+
+from scheduler import start_scheduler
 
 import os
 import logging
@@ -48,9 +53,11 @@ def create_app():
     app.register_blueprint(audio_tools_bp, url_prefix='/audio')
     app.register_blueprint(create_images_bp, url_prefix='/create_images')
     app.register_blueprint(social_bp, url_prefix='/social')
+    app.register_blueprint(setup_video_prompt_bp, url_prefix='/setup_video_prompt')
 
     with app.app_context():
         db.create_all()
+        start_scheduler()
 
     return app
 

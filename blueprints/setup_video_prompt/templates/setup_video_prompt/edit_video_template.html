@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2>Chỉnh sửa Video Template</h2>
+  <form method="POST">
+    <div class="mb-3">
+      <label class="form-label">Danh mục</label>
+      <select class="form-select" name="category_id" required>
+        {% for c in categories %}
+          <option value="{{ c.id }}" {% if c.id == vt.category_id %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Đường dẫn Video File</label>
+      <input type="text" class="form-control" name="video_file" value="{{ vt.video_file }}" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Title Pattern</label>
+      <input type="text" class="form-control" name="title_pattern" value="{{ vt.title_pattern }}" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Description Pattern</label>
+      <textarea class="form-control" name="description_pattern">{{ vt.description_pattern }}</textarea>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Default Tags</label>
+      <input type="text" class="form-control" name="default_tags" value="{{ vt.default_tags }}">
+    </div>
+    <button type="submit" class="btn btn-primary">Lưu</button>
+    <a href="{{ url_for('setup_video_prompt.index') }}" class="btn btn-secondary">Huỷ</a>
+  </form>
+</div>
+{% endblock %}

@@ -31,7 +31,93 @@
         </li>
     </ul>
 
-    <a href="#" class="btn btn-primary btn-sm">📤 Quản Lý Đăng video</a>
+<a href="{{ url_for('social.manage_videos', channel_id=channel.id) }}" class="btn btn-outline-primary btn-sm me-2">📤 Video</a>
+<a href="{{ url_for('social.manage_posts', channel_id=channel.id) }}" class="btn btn-outline-secondary btn-sm">📝 Bài viết</a>
+<!-- Nút mở modal upload video -->
+<button class="btn btn-outline-success btn-sm mt-2" data-bs-toggle="modal" data-bs-target="#uploadModal{{ channel.id }}">
+    📤 Upload Video
+</button>
+<!-- Modal Upload Video cho channel -->
+<div class="modal fade" id="uploadModal{{ channel.id }}" tabindex="-1" aria-labelledby="uploadModalLabel{{ channel.id }}" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('social.upload_video') }}" enctype="multipart/form-data">
+        <div class="modal-header">
+          <h5 class="modal-title" id="uploadModalLabel{{ channel.id }}">📤 Upload video cho kênh {{ channel.title }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="channel_id" value="{{ channel.id }}">
+
+          <div class="mb-3">
+            <label class="form-label">Tiêu đề</label>
+            <input type="text" name="title" class="form-control" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Mô tả</label>
+            <textarea name="description" class="form-control" rows="3"></textarea>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Tags (phân cách bằng dấu phẩy)</label>
+            <input type="text" name="tags" class="form-control">
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Thể loại (Topic)</label>
+              <select name="topic_id" class="form-select">
+                <option value="">-- Không chọn --</option>
+                {% for topic in topics %}
+                <option value="{{ topic.id }}">{{ topic.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-md-3 mb-3">
+              <label class="form-label">Loại video</label>
+              <select name="video_type" class="form-select">
+                <option value="long">🎥 Long</option>
+                <option value="short">📱 Short</option>
+              </select>
+            </div>
+
+            <div class="col-md-3 mb-3">
+              <label class="form-label">Chế độ</label>
+              <select name="privacy_status" class="form-select">
+                <option value="private">🔒 Private</option>
+                <option value="unlisted">🔗 Unlisted</option>
+                <option value="public">🌐 Public</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Thời gian đăng (tuỳ chọn)</label>
+            <input type="datetime-local" name="scheduled_time" class="form-control">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Chọn file video</label>
+            <input type="file" name="video_file" class="form-control" accept="video/*" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Thumbnail (tuỳ chọn)</label>
+            <input type="file" name="thumbnail_file" class="form-control" accept="image/*">
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success">📤 Lên lịch đăng</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Huỷ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
     <form method="POST" action="{{ url_for('social.delete_youtube_channel', channel_id=channel.channel_id) }}" onsubmit="return confirm('Bạn có chắc muốn xoá kênh này?');">
         <button type="submit" class="btn btn-outline-danger btn-sm mt-2">❌ Gỡ kênh</button>
     </form>

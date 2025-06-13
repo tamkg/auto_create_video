@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container my-5">
+  <h1 class="mb-4">Quản lý Cấu hình Tạo Video AI</h1>
+
+  <!-- Tabs điều hướng giữa các phần -->
+  <ul class="nav nav-tabs" id="setupTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="categories-tab" data-bs-toggle="tab" data-bs-target="#categories" type="button" role="tab">Danh mục</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="videos-tab" data-bs-toggle="tab" data-bs-target="#videos" type="button" role="tab">Video Templates</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="prompts-tab" data-bs-toggle="tab" data-bs-target="#prompts" type="button" role="tab">AI Prompt Templates</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="models-tab" data-bs-toggle="tab" data-bs-target="#models" type="button" role="tab">Model Configs</button>
+    </li>
+  </ul>
+
+  <div class="tab-content mt-4" id="setupTabsContent">
+    <!-- Categories -->
+    <div class="tab-pane fade show active" id="categories" role="tabpanel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>Danh sách Danh mục</h4>
+        <a href="{{ url_for('setup_video_prompt.create_category') }}" class="btn btn-primary">+ Thêm danh mục</a>
+      </div>
+      {% if categories %}
+        <table class="table table-bordered table-striped">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tên danh mục</th>
+              <th>Ngày tạo</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in categories %}
+            <tr>
+              <td>{{ c.id }}</td>
+              <td>{{ c.name }}</td>
+              <td>{{ c.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+              <td>
+                <a href="{{ url_for('setup_video_prompt.edit_category', id=c.id) }}" class="btn btn-sm btn-warning">Sửa</a>
+                <form method="POST" action="{{ url_for('setup_video_prompt.delete_category', id=c.id) }}" class="d-inline" onsubmit="return confirm('Bạn có chắc muốn xóa?')">
+                  <button type="submit" class="btn btn-sm btn-danger">Xóa</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div class="alert alert-info">Chưa có danh mục nào.</div>
+      {% endif %}
+    </div>
+
+    <!-- Video Templates -->
+    <div class="tab-pane fade" id="videos" role="tabpanel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>Video Templates</h4>
+        <a href="{{ url_for('setup_video_prompt.create_video_template') }}" class="btn btn-primary">+ Thêm video template</a>
+      </div>
+      {% if video_templates %}
+        <table class="table table-bordered table-striped">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Video File</th>
+              <th>Title Pattern</th>
+              <th>Category</th>
+              <th>Upload Count</th>
+              <th>Active</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for vt in video_templates %}
+            <tr>
+              <td>{{ vt.id }}</td>
+              <td>{{ vt.video_file }}</td>
+              <td title="{{ vt.title_pattern }}">{{ vt.title_pattern|truncate(50) }}</td>
+              <td>{{ vt.category.name }}</td>
+              <td>{{ vt.upload_count }}</td>
+              <td>{{ '✔' if vt.active else '✘' }}</td>
+              <td>
+                <a href="{{ url_for('setup_video_prompt.edit_video_template', id=vt.id) }}" class="btn btn-sm btn-warning">Sửa</a>
+                <form method="POST" action="{{ url_for('setup_video_prompt.delete_video_template', id=vt.id) }}" class="d-inline" onsubmit="return confirm('Xóa template này?')">
+                  <button type="submit" class="btn btn-sm btn-danger">Xóa</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div class="alert alert-info">Chưa có video template nào.</div>
+      {% endif %}
+    </div>
+
+    <!-- AI Prompt Templates -->
+    <div class="tab-pane fade" id="prompts" role="tabpanel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>AI Prompt Templates</h4>
+        <a href="{{ url_for('setup_video_prompt.create_prompt_template') }}" class="btn btn-primary">+ Thêm prompt</a>
+      </div>
+      {% if ai_prompt_templates %}
+        <table class="table table-bordered table-striped">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Task Type</th>
+              <th>Category</th>
+              <th>Model</th>
+              <th>Active</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in ai_prompt_templates %}
+            <tr>
+              <td>{{ p.id }}</td>
+              <td>{{ p.task_type }}</td>
+              <td>{{ p.category.name }}</td>
+              <td>{{ p.model_config.model_name }}</td>
+              <td>{{ '✔' if p.active else '✘' }}</td>
+              <td>
+                <a href="{{ url_for('setup_video_prompt.edit_prompt_template', id=p.id) }}" class="btn btn-sm btn-warning">Sửa</a>
+                <form method="POST" action="{{ url_for('setup_video_prompt.delete_prompt_template', id=p.id) }}" class="d-inline" onsubmit="return confirm('Xóa prompt này?')">
+                  <button type="submit" class="btn btn-sm btn-danger">Xóa</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div class="alert alert-info">Chưa có prompt nào.</div>
+      {% endif %}
+    </div>
+
+    <!-- AI Model Configs -->
+    <div class="tab-pane fade" id="models" role="tabpanel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>Model Configs</h4>
+        <a href="{{ url_for('setup_video_prompt.create_model_config') }}" class="btn btn-primary">+ Thêm model</a>
+      </div>
+      {% if model_configs %}
+        <table class="table table-bordered table-striped">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Provider</th>
+              <th>Model</th>
+              <th>Active</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in model_configs %}
+            <tr>
+              <td>{{ m.id }}</td>
+              <td>{{ m.provider }}</td>
+              <td>{{ m.model_name }}</td>
+              <td>{{ '✔' if m.active else '✘' }}</td>
+              <td>
+                <a href="{{ url_for('setup_video_prompt.edit_model_config', id=m.id) }}" class="btn btn-sm btn-warning">Sửa</a>
+                <form method="POST" action="{{ url_for('setup_video_prompt.delete_model_config', id=m.id) }}" class="d-inline" onsubmit="return confirm('Xóa config này?')">
+                  <button type="submit" class="btn btn-sm btn-danger">Xóa</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div class="alert alert-info">Chưa có cấu hình model nào.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4" style="max-width: 720px;">
+  <h3 class="mb-4">🎯 Tạo Prompt Template</h3>
+  <form method="POST" class="needs-validation" novalidate>
+
+    <div class="mb-3">
+      <label class="form-label">📂 Danh mục</label>
+      <select name="category_id" class="form-select" required>
+        {% for category in categories %}
+        <option value="{{ category.id }}">{{ category.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">🤖 Model config</label>
+      <select name="model_config_id" id="model_config_id" class="form-select" required>
+        {% for model in model_configs %}
+        <option value="{{ model.id }}">{{ model.provider }} - {{ model.model_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">🧩 Loại tác vụ</label>
+      <input type="text" name="task_type" class="form-control" required>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">📜 Prompt Template</label>
+      <textarea name="prompt_template" id="prompt_template" class="form-control" rows="3" required></textarea>
+    </div>
+
+    <!-- Test Prompt -->
+    <div class="card border shadow-sm mb-4">
+      <div class="card-body">
+        <h5 class="card-title mb-3">🔎 Test Prompt</h5>
+
+        <div class="mb-3">
+          <label class="form-label">✍️ Input để test (sẽ gán vào <code>{input}</code>)</label>
+          <input type="text" id="test_input" class="form-control" placeholder="Nhập nội dung ví dụ...">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">📝 Prompt sau khi thay <code>{input}</code></label>
+          <textarea id="preview_prompt" class="form-control" rows="3" readonly></textarea>
+        </div>
+
+        <div class="mb-3">
+          <button type="button" class="btn btn-sm btn-outline-primary" onclick="previewAndTestPrompt()">🚀 Gửi đến AI</button>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">📬 Phản hồi từ AI</label>
+          <div id="ai_response" class="border rounded p-3 bg-white" style="min-height: 150px; overflow-y: auto;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">🖊️ Mô tả</label>
+      <input type="text" name="description" class="form-control">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">📌 Phiên bản</label>
+      <input type="text" name="version" class="form-control">
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-success">💾 Tạo</button>
+      <a href="{{ url_for('setup_video_prompt.index') }}" class="btn btn-outline-secondary">🔙 Hủy</a>
+    </div>
+  </form>
+</div>
+
+<!-- JS xử lý test prompt -->
+<script>
+async function previewAndTestPrompt() {
+  const promptTemplate = document.getElementById('prompt_template').value;
+  const testInput = document.getElementById('test_input').value;
+  const modelConfigId = document.getElementById('model_config_id').value;
+  const previewArea = document.getElementById('preview_prompt');
+  const responseArea = document.getElementById('ai_response');
+
+  const finalPrompt = promptTemplate.replaceAll('{input}', testInput);
+  previewArea.value = finalPrompt;
+  responseArea.innerHTML = '<em class="text-muted">⏳ Đang gửi đến AI...</em>';
+
+  try {
+    const res = await fetch('/setup_video_prompt/api/test_prompt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: finalPrompt,
+        model_config_id: Number(modelConfigId)
+      })
+    });
+
+    const data = await res.json();
+    responseArea.innerHTML = data.response || `<span class="text-danger">${data.error || '⚠️ Không có phản hồi.'}</span>`;
+  } catch (err) {
+    console.error(err);
+    responseArea.innerHTML = '<span class="text-danger">❌ Lỗi khi gửi request đến AI.</span>';
+  }
+}
+</script>
+{% endblock %}

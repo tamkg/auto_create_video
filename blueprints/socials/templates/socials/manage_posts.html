@@ -1,0 +1,9 @@
+<h2>Quản lý Bài viết</h2>
+{% for post in posts %}
+  <div>
+    <strong>{{ post.title }}</strong> ({{ post.channel_title }})<br>
+    {{ post.description }}<br>
+    🕒 {{ post.published_at }}
+  </div>
+  <hr>
+{% endfor %}

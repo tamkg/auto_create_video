@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Tạo Model Config</h2>
+    <form method="POST">
+        <div class="mb-3">
+            <label for="provider" class="form-label">Nhà cung cấp</label>
+            <input type="text" name="provider" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="model_name" class="form-label">Tên model</label>
+            <input type="text" name="model_name" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="endpoint" class="form-label">Endpoint (nếu có)</label>
+            <input type="text" name="endpoint" class="form-control">
+        </div>
+
+        <div class="mb-3">
+            <label for="api_key" class="form-label">API Key</label>
+            <input type="password" name="api_key" class="form-control">
+        </div>
+
+        <button type="submit" class="btn btn-primary">Tạo</button>
+        <a href="{{ url_for('setup_video_prompt.index') }}" class="btn btn-secondary">Hủy</a>
+    </form>
+</div>
+{% endblock %}

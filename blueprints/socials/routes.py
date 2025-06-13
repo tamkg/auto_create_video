@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from models import YouTubeChannel
+from models import YouTubeChannel, ScheduledVideo, Topic  
 from extensions import db
 import os
 import json
@@ -10,6 +10,7 @@ from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
+# from .func import upload_video_to_youtube
 
 # ✅ Bỏ cảnh báo HTTPS
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
@@ -94,8 +95,9 @@ def list_youtube_channels():
         info = get_channel_info_from_credentials(channel.credentials_json)
         if info:
             enriched_channels.append({
+                "id": channel.id, # cột id trong db
                 "title": info["title"],
-                "channel_id": channel.channel_id,
+                "channel_id": channel.channel_id, # id của chanel ytb
                 "thumbnail_url": info["thumbnail"],
                 "subscribers": info["subscribers"],
                 "views": info["views"],
@@ -104,6 +106,7 @@ def list_youtube_channels():
             })
         else:
             enriched_channels.append({
+                "id": channel.id,
                 "title": channel.title or "Không lấy được",
                 "channel_id": channel.channel_id,
                 "thumbnail_url": channel.thumbnail_url,
@@ -245,3 +248,221 @@ def delete_youtube_channel(channel_id):
     db.session.commit()
     flash(f"Đã xoá kênh: {channel.title}", "success")
     return redirect(url_for("social.list_youtube_channels"))
+
+
+@social_bp.route("/youtube/videos/manage", methods=["GET"], endpoint="manage_videos")
+def manage_videos():
+    channel_id = request.args.get("channel_id", type=int)
+    if channel_id:
+        channels = YouTubeChannel.query.filter_by(id=channel_id).all()
+    else:
+        channels = YouTubeChannel.query.all()
+
+    video_data = []
+
+    for channel in channels:
+        creds = get_fresh_credentials_and_update_db(channel)
+        if not creds:
+            continue
+
+        try:
+            youtube = build("youtube", "v3", credentials=creds)
+
+            search_response = youtube.search().list(
+                part="id",
+                forMine=True,
+                type="video",
+                maxResults=10
+            ).execute()
+
+            video_ids = [item["id"]["videoId"] for item in search_response.get("items", []) if "videoId" in item["id"]]
+            if not video_ids:
+                continue
+
+            videos_response = youtube.videos().list(
+                part="snippet,statistics",
+                id=",".join(video_ids)
+            ).execute()
+
+            for item in videos_response.get("items", []):
+                video_data.append({
+                    "channel_title": channel.title,
+                    "video_id": item["id"],
+                    "title": item["snippet"]["title"],
+                    "description": item["snippet"].get("description", ""),
+                    "published_at": item["snippet"]["publishedAt"],
+                    "thumbnail_url": item["snippet"]["thumbnails"]["default"]["url"],
+                    "views": item["statistics"].get("viewCount", "N/A"),
+                    "likes": item["statistics"].get("likeCount", "N/A")
+                })
+
+        except Exception as e:
+            print(f"❌ Lỗi khi lấy video của kênh {channel.title}: {e}")
+
+    return render_template("socials/manage_videos.html", videos=video_data, channel_id=channel_id)
+
+
+@social_bp.route("/youtube/posts/manage", methods=["GET"], endpoint="manage_posts")
+def manage_posts():
+    channel_id = request.args.get("channel_id", type=int)
+    if channel_id:
+        channels = YouTubeChannel.query.filter_by(id=channel_id).all()
+    else:
+        channels = YouTubeChannel.query.all()
+
+    posts = []
+
+    for channel in channels:
+        creds = get_fresh_credentials_and_update_db(channel)
+        if not creds:
+            continue
+
+        try:
+            youtube = build("youtube", "v3", credentials=creds)
+
+            activities_response = youtube.activities().list(
+                part="snippet,contentDetails",
+                mine=True,
+                maxResults=10
+            ).execute()
+
+            for item in activities_response.get("items", []):
+                kind = item["snippet"]["type"]
+                if kind == "upload":
+                    video_id = item["contentDetails"]["upload"]["videoId"]
+                    posts.append({
+                        "channel_title": channel.title,
+                        "title": item["snippet"].get("title", "[Không có tiêu đề]"),
+                        "published_at": item["snippet"]["publishedAt"],
+                        "description": item["snippet"].get("description", ""),
+                        "video_id": video_id
+                    })
+        except Exception as e:
+            print(f"❌ Lỗi khi lấy bài viết từ kênh {channel.title}: {e}")
+
+    return render_template("socials/manage_posts.html", posts=posts, channel_id=channel_id)
+
+
+# Func normal
+def upload_video_to_youtube(video: ScheduledVideo):
+    from googleapiclient.http import MediaFileUpload
+    from models import YouTubeChannel
+    from extensions import db
+    import traceback
+
+    channel = YouTubeChannel.query.get(video.channel_id)
+    if not channel:
+        print("❌ Không tìm thấy kênh.")
+        return
+
+    creds = get_fresh_credentials_and_update_db(channel)
+    if not creds:
+        print("❌ Không lấy được credentials.")
+        return
+
+    youtube = build("youtube", "v3", credentials=creds)
+
+    tags_list = [tag.strip() for tag in video.tags.split(",")] if video.tags else []
+
+    body = {
+        "snippet": {
+            "title": video.title,
+            "description": video.description or "",
+            "tags": tags_list,
+            "categoryId": "22",  # Mặc định: People & Blogs
+        },
+        "status": {
+            "privacyStatus": video.privacy_status,
+        },
+    }
+
+    media = MediaFileUpload(video.video_file, resumable=True)
+
+    try:
+        insert_request = youtube.videos().insert(
+            part="snippet,status",
+            body=body,
+            media_body=media
+        )
+        response = insert_request.execute()
+
+        video.youtube_video_id = response["id"]
+        video.status = "uploaded"
+        video.uploaded_at = datetime.utcnow()
+        db.session.commit()
+        print(f"✅ Đã đăng video: {video.title}")
+    except Exception as e:
+        print(f"❌ Upload thất bại: {e}")
+        print(traceback.format_exc())
+        video.status = "failed"
+        db.session.commit()
+
+
+
+@social_bp.route("/youtube/videos/upload", methods=["POST"], endpoint="upload_video")
+def upload_video():
+    try:
+        channel_id = request.form.get("channel_id")
+        topic_id = request.form.get("topic_id") or None
+        title = request.form.get("title")
+        description = request.form.get("description")
+        tags = request.form.get("tags")
+        video_type = request.form.get("video_type", "long")
+        privacy_status = request.form.get("privacy_status", "private")
+
+        scheduled_time_str = request.form.get("scheduled_time")
+        scheduled_time = (
+            datetime.fromisoformat(scheduled_time_str)
+            if scheduled_time_str else None
+        )
+
+        video_file = request.files["video_file"]
+        thumbnail_file = request.files.get("thumbnail_file")
+
+        if not video_file:
+            flash("Chưa chọn file video.", "danger")
+            return redirect(url_for("social.manage_videos"))
+
+        # Tạo thư mục lưu
+        video_folder = os.path.join("uploads", "videos")
+        thumb_folder = os.path.join("uploads", "thumbnails")
+        os.makedirs(video_folder, exist_ok=True)
+        os.makedirs(thumb_folder, exist_ok=True)
+
+        # Lưu video
+        video_filename = secure_filename(video_file.filename)
+        video_path = os.path.join(video_folder, video_filename)
+        video_file.save(video_path)
+
+        thumbnail_path = None
+        if thumbnail_file and thumbnail_file.filename:
+            thumbnail_filename = secure_filename(thumbnail_file.filename)
+            thumbnail_path = os.path.join(thumb_folder, thumbnail_filename)
+            thumbnail_file.save(thumbnail_path)
+
+        new_video = ScheduledVideo(
+            channel_id=channel_id,
+            topic_id=topic_id,
+            title=title,
+            description=description,
+            tags=tags,
+            video_type=video_type,
+            privacy_status=privacy_status,
+            video_file=video_path,
+            thumbnail_file=thumbnail_path,
+            scheduled_time=scheduled_time,
+            status="pending"
+        )
+
+        db.session.add(new_video)
+        db.session.commit()
+
+        # ✅ Nếu không có scheduled_time thì upload luôn
+        if scheduled_time is None:
+            upload_video_to_youtube(new_video)
+
+        flash("✅ Video đã được lên lịch đăng!" if scheduled_time else "✅ Video đã được đăng ngay!", "success")
+    except Exception as e:
+        flash(f"❌ Có lỗi xảy ra khi lên lịch: {e}", "danger")
+
+    return redirect(url_for("social.manage_videos"))

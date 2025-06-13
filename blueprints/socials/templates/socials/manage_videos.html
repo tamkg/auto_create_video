@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Quản lý Video{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+  <h2 class="mb-4 fw-bold text-primary">🎬 Quản lý Video</h2>
+
+  {% if videos %}
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-4">
+      {% for video in videos %}
+        <div class="col">
+          <div class="card h-100 shadow-sm border-0">
+            <img src="{{ video.thumbnail_url }}" class="card-img-top" alt="Thumbnail" style="object-fit: cover; height: 180px;">
+            <div class="card-body">
+              <h5 class="card-title text-truncate" title="{{ video.title }}">
+                {{ video.title }}
+              </h5>
+              <p class="card-text text-muted small mb-1">
+                <i class="fa fa-user-circle me-1"></i> {{ video.channel_title }}
+              </p>
+              <p class="card-text small text-secondary" style="max-height: 4.5em; overflow: hidden; text-overflow: ellipsis;">
+                {{ video.description }}
+              </p>
+            </div>
+            <div class="card-footer d-flex justify-content-between text-muted small bg-light">
+              <span><i class="fa fa-eye me-1"></i>{{ video.views }}</span>
+              <span><i class="fa fa-heart me-1"></i>{{ video.likes }}</span>
+              <span><i class="fa fa-clock me-1"></i>{{ video.published_at[:10] }}</span>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="alert alert-info">
+      Không có video nào để hiển thị.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

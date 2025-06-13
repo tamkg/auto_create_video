@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Thêm danh mục mới</h2>
+    
+    <form method="POST" action="{{ url_for('setup_video_prompt.create_category') }}">
+        <div class="mb-3">
+            <label for="name" class="form-label">Tên danh mục</label>
+            <input type="text" class="form-control" id="name" name="name" placeholder="Nhập tên danh mục" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Tạo mới</button>
+        <a href="{{ url_for('setup_video_prompt.index') }}" class="btn btn-secondary">Quay lại</a>
+    </form>
+</div>
+{% endblock %}

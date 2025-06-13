@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2>Cập nhật Prompt Template</h2>
+  <form method="POST">
+    <div class="mb-3">
+      <label class="form-label">Danh mục</label>
+      <select class="form-select" name="category_id" required>
+        {% for cat in categories %}
+          <option value="{{ cat.id }}" {% if cat.id == prompt.category_id %}selected{% endif %}>{{ cat.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Model</label>
+      <select class="form-select" name="model_config_id" required>
+        {% for m in model_configs %}
+          <option value="{{ m.id }}" {% if m.id == prompt.model_config_id %}selected{% endif %}>
+            {{ m.provider }} - {{ m.model_name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Task Type</label>
+      <input type="text" class="form-control" name="task_type" value="{{ prompt.task_type }}" required>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Prompt Template</label>
+      <textarea class="form-control" name="prompt_template" rows="5" required>{{ prompt.prompt_template }}</textarea>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Mô tả</label>
+      <textarea class="form-control" name="description" rows="3">{{ prompt.description }}</textarea>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Phiên bản</label>
+      <input type="text" class="form-control" name="version" value="{{ prompt.version }}">
+    </div>
+
+    <button type="submit" class="btn btn-primary">Lưu</button>
+    <a href="{{ url_for('setup_video_prompt.index') }}" class="btn btn-secondary">Huỷ</a>
+  </form>
+</div>
+{% endblock %}
