@@ -12,6 +12,26 @@ from gtts.lang import tts_langs
 import logging
 from flask import current_app
 
+import re
+from pydub import AudioSegment
+
+def split_text(text, max_length=1000):
+    """Chia đoạn văn bản dài thành các phần nhỏ để dịch và đọc TTS."""
+    sentences = re.split(r'(?<=[.!?]) +', text)
+    parts = []
+    current_part = ""
+
+    for sentence in sentences:
+        if len(current_part) + len(sentence) < max_length:
+            current_part += " " + sentence
+        else:
+            parts.append(current_part.strip())
+            current_part = sentence
+    if current_part:
+        parts.append(current_part.strip())
+
+    return parts
+
 video_bp = Blueprint('video', __name__, template_folder="templates")
 
 @video_bp.route("/")
@@ -163,36 +183,30 @@ def delete_image(image_id):
 
 @video_bp.route('/video/<int:video_id>/export')
 def export_video(video_id):
-    # Lấy thêm các thông số cấu hình video từ form
     codec = request.args.get("codec", "libx264")
-    bitrate = request.args.get("bitrate", "8000k")  # Tăng bitrate video
-    preset = request.args.get("preset", "slow")     # Chất lượng cao hơn
+    bitrate = request.args.get("bitrate", "8000k")
+    preset = request.args.get("preset", "slow")
     audio_codec = request.args.get("audio_codec", "aac")
-    audio_bitrate = request.args.get("audio_bitrate", "192k")    
+    audio_bitrate = request.args.get("audio_bitrate", "192k")
+    target_lang = request.args.get("lang", "en")
+    ratio = request.args.get("ratio", "horizontal")
 
     video = Video.query.get_or_404(video_id)
-    segments = Segment.query.filter(Segment.video_id == video.id).order_by(Segment.order_index).all()
-
+    segments = Segment.query.filter_by(video_id=video.id).order_by(Segment.order_index).all()
     if not segments:
         flash("Video chưa có đoạn nào để xuất!")
         return redirect(url_for('video.index'))
 
-    # Lấy tham số từ query string
-    target_lang = request.args.get("lang", "en")
-    ratio = request.args.get("ratio", "horizontal")  # new
-
-    supported_langs = tts_langs()
-    if target_lang not in supported_langs:
+    from gtts.lang import tts_langs
+    if target_lang not in tts_langs():
         flash(f"Ngôn ngữ không được hỗ trợ: {target_lang}")
         return redirect(url_for('video.index'))
 
-    # Xác định kích thước video theo tỉ lệ
-    if ratio == "vertical":
-        target_size = (1080, 1920)  # 9:16 Full HD
-    elif ratio == "square":
-        target_size = (1080, 1080)  # 1:1 Full HD
-    else:
-        target_size = (1920, 1080)  # 16:9 Full HD
+    target_size = {
+        "vertical": (1080, 1920),
+        "square": (1080, 1080),
+        "horizontal": (1920, 1080)
+    }.get(ratio, (1920, 1080))
 
     temp_dir = tempfile.mkdtemp()
     clips = []
@@ -200,77 +214,68 @@ def export_video(video_id):
     try:
         for i, segment in enumerate(segments):
             try:
-                # Dịch văn bản
-                translated_text = GoogleTranslator(source='vi', target=target_lang).translate(segment.text)
+                text_chunks = split_text(segment.text, max_length=1000)
+                translated_chunks = []
+                for chunk in text_chunks:
+                    translated = GoogleTranslator(source='vi', target=target_lang).translate(chunk)
+                    translated_chunks.append(translated)
 
-                # Tạo audio từ TTS
-                tts = gTTS(text=translated_text, lang=target_lang)
-                audio_path = os.path.join(temp_dir, f"audio_{i}.mp3")
-                tts.save(audio_path)
+                audio = AudioSegment.empty()
+                for j, part in enumerate(translated_chunks):
+                    part_path = os.path.join(temp_dir, f"audio_{i}_{j}.mp3")
+                    gTTS(part, lang=target_lang).save(part_path)
+                    audio += AudioSegment.from_mp3(part_path)
 
-                if not os.path.exists(audio_path):
-                    flash(f"Không tạo được audio cho đoạn {i + 1}")
-                    continue
+                audio_path = os.path.join(temp_dir, f"full_audio_{i}.mp3")
+                audio.export(audio_path, format="mp3")
 
-                # Xử lý ảnh
                 if segment.images:
                     img_path = os.path.join(basedir, segment.images[0].file_path)
                 else:
                     img_path = os.path.join(basedir, 'static/default.jpg')
 
-                if not os.path.exists(img_path):
-                    flash(f"Không tìm thấy ảnh cho đoạn {i + 1}")
-                    continue
-
-                # Xử lý ảnh để full màn hình (tự động crop thông minh)
                 with PILImage.open(img_path) as img:
                     img_ratio = img.width / img.height
                     target_ratio = target_size[0] / target_size[1]
 
                     if img_ratio > target_ratio:
-                        # Ảnh rộng hơn tỷ lệ, crop chiều ngang
                         new_height = target_size[1]
                         new_width = int(new_height * img_ratio)
                         img = img.resize((new_width, new_height), PILImage.Resampling.LANCZOS)
                         left = (new_width - target_size[0]) // 2
                         img = img.crop((left, 0, left + target_size[0], target_size[1]))
                     else:
-                        # Ảnh cao hơn tỷ lệ, crop chiều dọc
                         new_width = target_size[0]
                         new_height = int(new_width / img_ratio)
                         img = img.resize((new_width, new_height), PILImage.Resampling.LANCZOS)
                         top = (new_height - target_size[1]) // 2
                         img = img.crop((0, top, target_size[0], top + target_size[1]))
 
-                    # Lưu ảnh đã được crop và resize
                     resized_img_path = os.path.join(temp_dir, f"resized_{i}.jpg")
                     img.save(resized_img_path, quality=95)
 
-                # Tạo video clip từ ảnh + audio
                 audio_clip = AudioFileClip(audio_path)
                 duration = audio_clip.duration
                 image_clip = ImageClip(resized_img_path).with_duration(duration).with_audio(audio_clip)
                 clips.append(image_clip)
-            
-            except Exception as seg_error:
-                flash(f"Lỗi xử lý đoạn {i + 1}: {seg_error}")
+
+            except Exception as seg_err:
+                flash(f"Lỗi xử lý đoạn {i+1}: {seg_err}")
                 continue
 
         if not clips:
             flash("Không thể tạo video vì lỗi ở tất cả các đoạn.")
             return redirect(url_for('video.index'))
 
-        # Kết hợp các clip và lưu
         exports_dir = os.path.join(basedir, 'exports')
         os.makedirs(exports_dir, exist_ok=True)
-
-        final_clip = concatenate_videoclips(clips, method="compose")
         output_path = os.path.join(exports_dir, f"{video.title}_{ratio}_export.mp4")
         audio_temp_path = os.path.join(temp_dir, "temp_audio.m4a")
 
+        final_clip = concatenate_videoclips(clips, method="compose")
         final_clip.write_videofile(
             output_path,
-            fps=60,  # Khung hình cao hơn nên để 30 cho ảnh còn đâu 60 là cho video động 
+            fps=30,
             codec=codec,
             bitrate=bitrate,
             preset=preset,
