@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file
 from werkzeug.utils import secure_filename
-import os, tempfile, shutil
+import os, uuid, logging, shutil, tempfile
 from PIL import Image as PILImage
 from gtts import gTTS
 from deep_translator import GoogleTranslator
@@ -11,26 +11,10 @@ from models import Video, Segment, Image  # Giả sử model nằm trong models.
 from gtts.lang import tts_langs
 import logging
 from flask import current_app
-
-import re
-from pydub import AudioSegment
-
-def split_text(text, max_length=1000):
-    """Chia đoạn văn bản dài thành các phần nhỏ để dịch và đọc TTS."""
-    sentences = re.split(r'(?<=[.!?]) +', text)
-    parts = []
-    current_part = ""
-
-    for sentence in sentences:
-        if len(current_part) + len(sentence) < max_length:
-            current_part += " " + sentence
-        else:
-            parts.append(current_part.strip())
-            current_part = sentence
-    if current_part:
-        parts.append(current_part.strip())
-
-    return parts
+from .tts_service import get_voices, generate_audio, split_text
+from langdetect import detect
+import uuid
+from slugify import slugify
 
 video_bp = Blueprint('video', __name__, template_folder="templates")
 
@@ -38,7 +22,12 @@ video_bp = Blueprint('video', __name__, template_folder="templates")
 def index():
     videos = Video.query.all()
     languages = tts_langs()  # Trả về dict {'en': 'English', 'vi': 'Vietnamese', ...}
-    return render_template("videos/index.html", videos=videos, languages=languages)
+    edge_voices = get_voices()
+    print("Số giọng đọc Edge:", len(edge_voices))
+    return render_template("videos/index.html", 
+                           videos=videos, 
+                           languages=languages,
+                            edge_voices=edge_voices)
 
 @video_bp.route('/video/new', methods=['GET', 'POST'])
 def create_video():
@@ -183,6 +172,7 @@ def delete_image(image_id):
 
 @video_bp.route('/video/<int:video_id>/export')
 def export_video(video_id):
+    # --- Lấy thông số từ query params ---
     codec = request.args.get("codec", "libx264")
     bitrate = request.args.get("bitrate", "8000k")
     preset = request.args.get("preset", "slow")
@@ -190,61 +180,95 @@ def export_video(video_id):
     audio_bitrate = request.args.get("audio_bitrate", "192k")
     target_lang = request.args.get("lang", "en")
     ratio = request.args.get("ratio", "horizontal")
+    tts_engine = request.args.get("tts_type", "google")
+    voice = request.args.get("voice")
 
-    video = Video.query.get_or_404(video_id)
-    segments = Segment.query.filter_by(video_id=video.id).order_by(Segment.order_index).all()
-    if not segments:
-        flash("Video chưa có đoạn nào để xuất!")
-        return redirect(url_for('video.index'))
-
-    from gtts.lang import tts_langs
+    # --- Kiểm tra tham số ---
     if target_lang not in tts_langs():
         flash(f"Ngôn ngữ không được hỗ trợ: {target_lang}")
         return redirect(url_for('video.index'))
 
+    if tts_engine == "google" and not target_lang:
+        flash("Chưa chọn ngôn ngữ cho Google TTS.")
+        return redirect(url_for('video.index'))
+
+    if tts_engine == "edge" and not voice:
+        flash("Chưa chọn giọng đọc cho Edge TTS.")
+        return redirect(url_for('video.index'))
+
+    # --- Kích thước video theo tỷ lệ ---
     target_size = {
         "vertical": (1080, 1920),
         "square": (1080, 1080),
         "horizontal": (1920, 1080)
     }.get(ratio, (1920, 1080))
 
-    temp_dir = tempfile.mkdtemp()
-    clips = []
+    # --- Lấy video và các đoạn ---
+    video = Video.query.get_or_404(video_id)
+    segments = Segment.query.filter_by(video_id=video.id).order_by(Segment.order_index).all()
+    if not segments:
+        flash("Video chưa có đoạn nào để xuất!")
+        return redirect(url_for('video.index'))
 
-    try:
+    # --- Tạo thư mục tạm ---
+    with tempfile.TemporaryDirectory() as temp_dir:
+        clips = []
+
         for i, segment in enumerate(segments):
             try:
+                # --- Dịch nội dung nếu cần ---
+                source_lang = detect(segment.text)
                 text_chunks = split_text(segment.text, max_length=1000)
-                translated_chunks = []
-                for chunk in text_chunks:
-                    translated = GoogleTranslator(source='vi', target=target_lang).translate(chunk)
-                    translated_chunks.append(translated)
 
-                audio = AudioSegment.empty()
-                for j, part in enumerate(translated_chunks):
-                    part_path = os.path.join(temp_dir, f"audio_{i}_{j}.mp3")
-                    gTTS(part, lang=target_lang).save(part_path)
-                    audio += AudioSegment.from_mp3(part_path)
-
-                audio_path = os.path.join(temp_dir, f"full_audio_{i}.mp3")
-                audio.export(audio_path, format="mp3")
-
-                if segment.images:
-                    img_path = os.path.join(basedir, segment.images[0].file_path)
+                if source_lang != target_lang:
+                    translated_chunks = [
+                        GoogleTranslator(source=source_lang, target=target_lang).translate(chunk)
+                        for chunk in text_chunks
+                    ]
+                    translated_text = " ".join(translated_chunks)
+                    logging.info(f"[Segment {i+1}] Dịch: {source_lang} → {target_lang}")
                 else:
-                    img_path = os.path.join(basedir, 'static/default.jpg')
+                    translated_text = segment.text
+                    logging.info(f"[Segment {i+1}] Không cần dịch.")
+
+                # --- Tạo file audio bằng TTS (Google hoặc Edge) ---
+                audio_path = os.path.join(temp_dir, f"audio_{i}.mp3")
+                try:
+                    generate_audio(
+                        text=translated_text,
+                        lang=target_lang,
+                        voice=voice,
+                        output_path=audio_path,
+                        engine=tts_engine
+                    )
+                except Exception as e:
+                    flash(f"Không tạo được audio cho đoạn {i + 1}: {e}")
+                    logging.error(f"[Segment {i+1}] TTS lỗi: {e}", exc_info=True)
+                    continue
+
+                if not os.path.exists(audio_path):
+                    flash(f"Không tồn tại file audio đoạn {i + 1}")
+                    continue
+
+                # --- Resize ảnh ---
+                img_path = os.path.join(basedir, segment.images[0].file_path) if segment.images else os.path.join(basedir, 'static/default.jpg')
+                if not os.path.exists(img_path):
+                    flash(f"Không tìm thấy ảnh cho đoạn {i + 1}")
+                    continue
 
                 with PILImage.open(img_path) as img:
                     img_ratio = img.width / img.height
                     target_ratio = target_size[0] / target_size[1]
 
                     if img_ratio > target_ratio:
+                        # Cắt ngang
                         new_height = target_size[1]
                         new_width = int(new_height * img_ratio)
                         img = img.resize((new_width, new_height), PILImage.Resampling.LANCZOS)
                         left = (new_width - target_size[0]) // 2
                         img = img.crop((left, 0, left + target_size[0], target_size[1]))
                     else:
+                        # Cắt dọc
                         new_width = target_size[0]
                         new_height = int(new_width / img_ratio)
                         img = img.resize((new_width, new_height), PILImage.Resampling.LANCZOS)
@@ -254,43 +278,73 @@ def export_video(video_id):
                     resized_img_path = os.path.join(temp_dir, f"resized_{i}.jpg")
                     img.save(resized_img_path, quality=95)
 
+                # --- Tạo clip hình + tiếng ---
                 audio_clip = AudioFileClip(audio_path)
-                duration = audio_clip.duration
-                image_clip = ImageClip(resized_img_path).with_duration(duration).with_audio(audio_clip)
+                image_clip = ImageClip(resized_img_path).with_duration(audio_clip.duration).with_audio(audio_clip)
                 clips.append(image_clip)
 
-            except Exception as seg_err:
-                flash(f"Lỗi xử lý đoạn {i+1}: {seg_err}")
+            except Exception as seg_error:
+                logging.error(f"[Segment {i+1}] Lỗi xử lý: {seg_error}", exc_info=True)
+                flash(f"Lỗi xử lý đoạn {i + 1}: {seg_error}")
                 continue
 
+        # --- Kiểm tra nếu không tạo được đoạn nào ---
         if not clips:
             flash("Không thể tạo video vì lỗi ở tất cả các đoạn.")
             return redirect(url_for('video.index'))
 
+        # --- Ghép video ---
         exports_dir = os.path.join(basedir, 'exports')
         os.makedirs(exports_dir, exist_ok=True)
-        output_path = os.path.join(exports_dir, f"{video.title}_{ratio}_export.mp4")
-        audio_temp_path = os.path.join(temp_dir, "temp_audio.m4a")
 
         final_clip = concatenate_videoclips(clips, method="compose")
-        final_clip.write_videofile(
-            output_path,
-            fps=30,
-            codec=codec,
-            bitrate=bitrate,
-            preset=preset,
-            audio_codec=audio_codec,
-            audio_bitrate=audio_bitrate,
-            temp_audiofile=audio_temp_path,
-            remove_temp=True
-        )
+        output_filename = f"{slugify(video.title)}_{uuid.uuid4().hex[:8]}_{ratio}_export.mp4"
+        output_path = os.path.join(exports_dir, output_filename)
+        audio_temp_path = os.path.join(temp_dir, "temp_audio.m4a")
+
+        try:
+            final_clip.write_videofile(
+                output_path,
+                fps=30,
+                codec=codec,
+                bitrate=bitrate,
+                preset=preset,
+                audio_codec=audio_codec,
+                audio_bitrate=audio_bitrate,
+                temp_audiofile=audio_temp_path,
+                remove_temp=True
+            )
+        except Exception as e:
+            logging.error(f"Lỗi khi xuất video: {e}", exc_info=True)
+            flash(f"Lỗi khi xuất video: {e}")
+            return redirect(url_for('video.index'))
 
         return send_file(output_path, as_attachment=True)
 
-    except Exception as e:
-        logging.error(f"Lỗi khi xuất video: {e}", exc_info=True)
-        flash(f"Lỗi khi xuất video: {e}")
-        return redirect(url_for('video.index'))
 
+@video_bp.route('/api/test-voice', methods=['POST'])
+def test_voice():
+    text = request.form.get('text', '')
+    engine = request.form.get('engine', 'google')
+    lang = request.form.get('lang', 'en')
+    voice = request.form.get('voice')
+
+    if not text.strip():
+        return {"error": "Missing text"}, 400
+
+    temp_dir = tempfile.mkdtemp()
+    output_path = os.path.join(temp_dir, "test_voice.mp3")
+
+    try:
+        generate_audio(
+            text=text,
+            lang=lang,
+            voice=voice,
+            output_path=output_path,
+            engine=engine
+        )
+        return send_file(output_path, mimetype='audio/mpeg', as_attachment=False)
+    except Exception as e:
+        return {"error": str(e)}, 500
     finally:
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        pass  # Không xóa temp_dir ở đây để tránh xóa file trước khi gửi        
