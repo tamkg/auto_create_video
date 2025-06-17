@@ -22,7 +22,7 @@ video_bp = Blueprint('video', __name__, template_folder="templates")
 def index():
     videos = Video.query.all()
     languages = tts_langs()  # Trả về dict {'en': 'English', 'vi': 'Vietnamese', ...}
-    edge_voices = get_voices()
+    edge_voices = get_voices() # Trả về các giọng mà edge-tts hỗ trợ
     print("Số giọng đọc Edge:", len(edge_voices))
     return render_template("videos/index.html", 
                            videos=videos, 
@@ -348,3 +348,43 @@ def test_voice():
         return {"error": str(e)}, 500
     finally:
         pass  # Không xóa temp_dir ở đây để tránh xóa file trước khi gửi        
+
+
+
+@video_bp.route('/create_audio', methods=['POST'])
+def create_audio():
+    translated_text = request.form.get("translated_text", "")
+    tts_system = request.form.get("tts_system", "google")
+    google_voice = request.form.get("google_voice")
+    edge_voice = request.form.get("edge_voice")
+
+    if not translated_text.strip():
+        flash("Không có nội dung để tạo audio.")
+        return redirect(url_for("video.index"))
+
+    try:
+        # Chọn voice phù hợp theo engine
+        voice = google_voice if tts_system == "google" else edge_voice
+
+        # Tạo thư mục tạm để chứa file .mp3
+        temp_dir = tempfile.mkdtemp()
+        audio_path = os.path.join(temp_dir, f"audio_output.mp3")
+
+        # Gọi hàm tạo audio (đã có trong tts_service.py của bạn)
+        generate_audio(
+            text=translated_text,
+            lang=voice,  # Google: mã ngôn ngữ; Edge: tên voice
+            voice=voice,
+            output_path=audio_path,
+            engine=tts_system
+        )
+
+        if not os.path.exists(audio_path):
+            raise Exception("Không tìm thấy file âm thanh được tạo.")
+
+        return send_file(audio_path, mimetype="audio/mpeg", as_attachment=True, download_name="output_audio.mp3")
+
+    except Exception as e:
+        logging.error(f"Lỗi tạo audio: {e}", exc_info=True)
+        flash(f"Lỗi tạo audio: {e}")
+        return redirect(url_for("video.index"))

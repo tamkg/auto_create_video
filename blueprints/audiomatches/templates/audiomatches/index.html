@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Tạo Audio Khớp Video{% endblock %}
+
+{% block content %}
+<h2 class="text-center mt-4">🔊 Tạo Audio Khớp Với Video</h2>
+
+<!-- Select2 -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<div class="container mt-4">
+    <form method="POST">
+        <div class="mb-3">
+            <label for="content" class="form-label">Nhập nội dung có timestamp:</label>
+            <textarea name="content" id="content" class="form-control" rows="10" placeholder="00:00 Xin chào...">{{ content }}</textarea>
+        </div>
+
+        <div class="mb-3">
+            <label for="target_lang" class="form-label">Chọn ngôn ngữ đích:</label>
+            <select name="target_lang" id="target_lang" class="form-select">
+                {% for code, lang in languages.items() %}
+                    <option value="{{ code }}" {% if code == target_lang %}selected{% endif %}>
+                        {{ lang|title }} ({{ code }})
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">🌐 Dịch</button>
+    </form>
+
+    {% if translated %}
+    <hr>
+    <h4>Kết quả dịch:</h4>
+    <textarea class="form-control" rows="10" readonly>{{ translated }}</textarea>
+
+    <hr>
+    <h4>🎙️ Chọn hệ thống và giọng đọc:</h4>
+
+    <form id="create-audio-form" method="POST" action="{{ url_for('audiomatch.create_audio') }}">
+        <input type="hidden" name="translated_text" value="{{ translated|e }}">
+
+        <div class="mb-3">
+            <label class="form-label">Chọn hệ thống TTS:</label>
+            <select id="tts-system" name="tts_system" class="form-select">
+                <option value="google">Google TTS</option>
+                <option value="edge">Edge TTS</option>
+            </select>
+        </div>
+
+        <div class="mb-3" id="google-voice-select">
+            <label class="form-label">Chọn giọng Google:</label>
+            <select name="google_voice" class="form-select select2-google" style="width: 100%;">
+                <option></option>
+                {% for code, lang in google_tts_langs.items() %}
+                    <option value="{{ code }}">{{ lang|title }} ({{ code }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3 d-none" id="edge-voice-select">
+            <label class="form-label">Chọn giọng Edge:</label>
+            <select name="edge_voice" class="form-select select2-edge" style="width: 100%;">
+                <option></option>
+                {% for voice in edge_voices %}
+                    <option value="{{ voice.Name }}">{{ voice.Name }} - {{ voice.Gender }} - {{ voice.ContentCategories }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-success w-100">🎧 Tạo Audio</button>
+    </form>
+
+    <div id="audio-player" class="mt-4 d-none">
+        <h5>🎧 Nghe thử Audio:</h5>
+        <audio id="audio-preview" controls style="width: 100%;"></audio>
+    </div>
+
+    {% endif %}
+</div>
+
+<!-- Select2 JS -->
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+function toggleVoiceSelect() {
+    const system = document.getElementById("tts-system").value;
+    const google = document.getElementById("google-voice-select");
+    const edge = document.getElementById("edge-voice-select");
+
+    if (system === "google") {
+        google.classList.remove("d-none");
+        edge.classList.add("d-none");
+    } else {
+        google.classList.add("d-none");
+        edge.classList.remove("d-none");
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    $('.select2-google').select2({
+        placeholder: "Chọn giọng Google",
+        allowClear: true,
+        width: '100%'
+    });
+
+    $('.select2-edge').select2({
+        placeholder: "Chọn giọng Edge",
+        allowClear: true,
+        width: '100%'
+    });
+
+    toggleVoiceSelect();
+    document.getElementById("tts-system").addEventListener("change", toggleVoiceSelect);
+
+    // Xử lý tạo audio AJAX
+    const form = document.getElementById("create-audio-form");
+    form.addEventListener("submit", function (e) {
+        e.preventDefault();
+
+        const formData = new FormData(form);
+
+        fetch(form.action, {
+            method: "POST",
+            body: formData
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("Tạo audio thất bại");
+            return res.json();
+        })
+        .then(data => {
+            const audio = document.getElementById("audio-preview");
+            audio.src = data.audio_url;
+            document.getElementById("audio-player").classList.remove("d-none");
+            audio.load();
+            audio.play();
+        })
+        .catch(err => {
+            alert("Lỗi tạo audio: " + err.message);
+        });
+    });
+});
+</script>
+{% endblock %}

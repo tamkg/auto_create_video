@@ -12,6 +12,7 @@ from blueprints.audio_tools.routes import audio_tools_bp
 from blueprints.create_images.routes import create_images_bp
 from blueprints.socials.routes import social_bp
 from blueprints.setup_video_prompt.routes import setup_video_prompt_bp
+from blueprints.audiomatches.routes import audiomatch_bp
 
 
 
@@ -54,6 +55,7 @@ def create_app():
     app.register_blueprint(create_images_bp, url_prefix='/create_images')
     app.register_blueprint(social_bp, url_prefix='/social')
     app.register_blueprint(setup_video_prompt_bp, url_prefix='/setup_video_prompt')
+    app.register_blueprint(audiomatch_bp, url_prefix='/audiomatch_bp')
 
     with app.app_context():
         db.create_all()
