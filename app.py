@@ -15,7 +15,6 @@ from blueprints.setup_video_prompt.routes import setup_video_prompt_bp
 from blueprints.audiomatches.routes import audiomatch_bp
 
 
-
 from scheduler import start_scheduler
 
 import os
