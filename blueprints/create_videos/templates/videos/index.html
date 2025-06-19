@@ -5,9 +5,9 @@
 {% block head_extra %}
 <style>
     body {
-        max-width: 900px;
+        /* max-width: 900px; */
         margin: auto;
-        padding: 20px;
+        /* padding: 20px; */
         background-color: #f9f9f9;
     }
     .settings-popup {
@@ -32,10 +32,15 @@
 {% block content %}
 <h1 class="mb-4">📼 Danh sách Video</h1>
 
+<!-- Tìm kiếm -->
+<div class="mb-4">
+    <input type="text" id="searchInput" class="form-control" placeholder="Tìm kiếm theo tên hoặc ID video">
+</div>
+
 <a href="{{ url_for('video.create_video') }}" class="btn btn-success mb-4">+ Tạo Video Mới</a>
 
 {% for video in videos %}
-<div class="card mb-4 shadow-sm">
+<div class="card mb-4 shadow-sm video-item" data-title="{{ video.title|lower }}" data-id="{{ video.id }}">
     <div class="card-body position-relative">
         <h2 class="card-title h5">{{ video.title }}</h2>
         <p><strong>ID:</strong> {{ video.id }}</p>
@@ -221,6 +226,24 @@ document.querySelectorAll('.test-voice-btn').forEach(button => {
             this.disabled = false;
             this.innerHTML = this.dataset.originalText || "🔊 Test";
         });
+    });
+});
+
+// Lắng nghe sự kiện input của ô tìm kiếm
+document.getElementById('searchInput').addEventListener('input', function () {
+    const searchTerm = this.value.toLowerCase(); // Chuyển chữ thường để so sánh không phân biệt hoa thường
+    const videoItems = document.querySelectorAll('.video-item'); // Lấy tất cả các video item
+    
+    videoItems.forEach(item => {
+        const title = item.getAttribute('data-title'); // Lấy tiêu đề video
+        const id = item.getAttribute('data-id'); // Lấy ID video
+
+        // Kiểm tra nếu tiêu đề hoặc ID chứa từ khóa tìm kiếm
+        if (title.includes(searchTerm) || id.includes(searchTerm)) {
+            item.style.display = ''; // Hiển thị video nếu tìm thấy
+        } else {
+            item.style.display = 'none'; // Ẩn video nếu không tìm thấy
+        }
     });
 });
 </script>
