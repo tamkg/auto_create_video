@@ -17,7 +17,7 @@ from .tts_service import get_voices, generate_audio, split_text
 from langdetect import detect
 import uuid
 from slugify import slugify
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image as PILImage, ImageDraw, ImageFont
 
 from io import BytesIO
 
@@ -485,7 +485,7 @@ def preview_font():
 
     try:
         font = ImageFont.truetype(font_path, size=48)
-        image = Image.new("RGB", (1000, 200), color="white")
+        image = PILImage.new("RGB", (1000, 200), color="white")
         draw = ImageDraw.Draw(image)
         draw.text((10, 50), text, font=font, fill="black")
 

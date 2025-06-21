@@ -309,11 +309,48 @@
     });
 
 
-document.querySelectorAll(`#text_method_${videoId}`).forEach(select => {
+document.querySelectorAll("[id^='text_method_']").forEach(select => {
     select.addEventListener("change", function () {
+        // Lấy videoId từ id của select, ví dụ id="text_method_123" -> videoId = "123"
+        const videoId = this.id.replace("text_method_", "");
         const bgColorInput = document.querySelector(`#bg_color_${videoId}`).closest('.mt-2');
-        bgColorInput.style.display = this.value === "caption" ? "block" : "none";
+        if (bgColorInput) {
+            bgColorInput.style.display = this.value === "caption" ? "block" : "none";
+        }
     });
-});    
+
+    // Trigger event lần đầu để set đúng trạng thái hiển thị lúc load
+    select.dispatchEvent(new Event('change'));
+});
+
+
+// Hàm lọc giọng đọc theo tên và giới tính
+function filterEdgeVoices(container) {
+    const nameFilter = container.querySelector('.filter-name-input').value.toLowerCase();
+    const genderFilter = container.querySelector('.filter-gender-select').value;
+    const rows = container.querySelectorAll('tbody tr');
+
+    rows.forEach(row => {
+        const voiceName = row.querySelector('.voice-name').textContent.toLowerCase();
+        const voiceGender = row.querySelector('.voice-gender').textContent;
+
+        const matchesName = voiceName.includes(nameFilter);
+        const matchesGender = !genderFilter || voiceGender === genderFilter;
+
+        row.style.display = (matchesName && matchesGender) ? '' : 'none';
+    });
+}
+
+// Áp dụng sự kiện lọc cho tất cả bảng giọng đọc Edge TTS trên trang
+document.querySelectorAll('.tts-edge').forEach(container => {
+    const nameInput = container.querySelector('.filter-name-input');
+    const genderSelect = container.querySelector('.filter-gender-select');
+
+    if (nameInput && genderSelect) {
+        nameInput.addEventListener('input', () => filterEdgeVoices(container));
+        genderSelect.addEventListener('change', () => filterEdgeVoices(container));
+    }
+});
+
 </script>
 {% endblock %}
