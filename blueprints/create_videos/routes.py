@@ -4,7 +4,9 @@ import os, uuid, logging, shutil, tempfile
 from PIL import Image as PILImage
 from gtts import gTTS
 from deep_translator import GoogleTranslator
-from moviepy import ImageClip, AudioFileClip, concatenate_videoclips
+from moviepy import ImageClip, AudioFileClip, concatenate_videoclips, CompositeVideoClip, TextClip, ColorClip
+from moviepy.video.fx.FadeIn import FadeIn
+from moviepy.video.fx.FadeOut import FadeOut
 
 from extensions import db, basedir
 from models import Video, Segment, Image  # Giả sử model nằm trong models.py
@@ -15,20 +17,39 @@ from .tts_service import get_voices, generate_audio, split_text
 from langdetect import detect
 import uuid
 from slugify import slugify
+from PIL import Image, ImageDraw, ImageFont
+
+from io import BytesIO
+
+from .fonts import find_fonts
 
 video_bp = Blueprint('video', __name__, template_folder="templates")
 
 @video_bp.route("/")
 def index():
     videos = Video.query.all()
-    languages = tts_langs()  # Trả về dict {'en': 'English', 'vi': 'Vietnamese', ...}
-    edge_voices = get_voices() # Trả về các giọng mà edge-tts hỗ trợ
-    print("Số giọng đọc Edge:", len(edge_voices))
-    return render_template("videos/index.html", 
-                           videos=videos, 
-                           languages=languages,
-                            edge_voices=edge_voices)
 
+    # Ngôn ngữ hỗ trợ của TTS (Google/Edge)
+    languages = tts_langs()  # Trả về dict {'en': 'English', 'vi': 'Vietnamese', ...}
+
+    # Danh sách giọng đọc Edge TTS
+    edge_voices = get_voices()  # Trả về danh sách voice từ Edge
+
+    # Tìm tất cả font chữ từ hệ thống (name thôi, không cần path)
+    fonts = [f.name for f in find_fonts() if f.name.lower().endswith((".ttf", ".otf"))]
+
+    # Log ra số lượng để kiểm tra
+    print("Số giọng đọc Edge:", len(edge_voices))
+    print("Số font tìm thấy:", len(fonts))
+
+    # Truyền tất cả vào template
+    return render_template(
+        "videos/index.html",
+        videos=videos,
+        languages=languages,
+        edge_voices=edge_voices,
+        fonts=fonts   # ✅ Thêm dòng này
+    )
 @video_bp.route('/video/new', methods=['GET', 'POST'])
 def create_video():
     if request.method == 'POST':
@@ -172,7 +193,7 @@ def delete_image(image_id):
 
 @video_bp.route('/video/<int:video_id>/export')
 def export_video(video_id):
-    # --- Lấy thông số từ query params ---
+    # --- Nhận thông số từ query params ---
     codec = request.args.get("codec", "libx264")
     bitrate = request.args.get("bitrate", "8000k")
     preset = request.args.get("preset", "slow")
@@ -183,7 +204,21 @@ def export_video(video_id):
     tts_engine = request.args.get("tts_type", "google")
     voice = request.args.get("voice")
 
-    # --- Kiểm tra tham số ---
+    # Thông số hiển thị text
+    show_text = request.args.get("show_text") == "yes"  # checkbox "hiện text"
+    text_method = request.args.get("text_method", "caption")  # "caption" hoặc "label"
+
+    # Lấy font chữ do người dùng chọn
+    selected_font = request.args.get("font")    
+
+    font_size = int(request.args.get("font_size", 40))
+    bg_color = request.args.get("bg_color", "black" if text_method == "caption" else None)
+
+
+    stroke_color = request.args.get("stroke_color") or None
+    stroke_width = int(request.args.get("stroke_width") or 0)
+
+    # --- Kiểm tra hợp lệ ---
     if target_lang not in tts_langs():
         flash(f"Ngôn ngữ không được hỗ trợ: {target_lang}")
         return redirect(url_for('video.index'))
@@ -196,58 +231,68 @@ def export_video(video_id):
         flash("Chưa chọn giọng đọc cho Edge TTS.")
         return redirect(url_for('video.index'))
 
-    # --- Kích thước video theo tỷ lệ ---
+    # --- Kích thước video theo tỉ lệ ---
     target_size = {
         "vertical": (1080, 1920),
         "square": (1080, 1080),
         "horizontal": (1920, 1080)
     }.get(ratio, (1920, 1080))
 
-    # --- Lấy video và các đoạn ---
+    # --- Lấy dữ liệu video ---
     video = Video.query.get_or_404(video_id)
     segments = Segment.query.filter_by(video_id=video.id).order_by(Segment.order_index).all()
     if not segments:
         flash("Video chưa có đoạn nào để xuất!")
         return redirect(url_for('video.index'))
 
-    # --- Tạo thư mục tạm ---
+    # --- Xác định font cần dùng (người dùng chọn hoặc fallback) ---
+    if selected_font:
+        try:
+            _ = ImageFont.truetype(selected_font, size=20)  # kiểm tra font tồn tại hợp lệ
+            font_used = selected_font
+        except Exception as e:
+            logging.warning(f"Font không dùng được: {selected_font}, lỗi: {e}")
+            font_used = "DejaVuSans-Bold"
+    else:
+        # Không chọn -> fallback mặc định
+        try:
+            _ = ImageFont.truetype(r"C:\Windows\Fonts\timesbd.ttf", size=20)
+            font_used = r"C:\Windows\Fonts\timesbd.ttf"
+        except Exception as e:
+            logging.warning(f"Không dùng được font fallback: {e}")
+            font_used = "DejaVuSans-Bold"
+            
+    logging.info(f"Sử dụng font: {font_used}")
+            
     with tempfile.TemporaryDirectory() as temp_dir:
         clips = []
 
         for i, segment in enumerate(segments):
             try:
-                # --- Dịch nội dung nếu cần ---
+                # --- Dịch đoạn văn ---
                 source_lang = detect(segment.text)
-                text_chunks = split_text(segment.text, max_length=1000)
-
+                original_chunks = split_text(segment.text, max_length=1000)
                 if source_lang != target_lang:
                     translated_chunks = [
                         GoogleTranslator(source=source_lang, target=target_lang).translate(chunk)
-                        for chunk in text_chunks
+                        for chunk in original_chunks
                     ]
                     translated_text = " ".join(translated_chunks)
-                    logging.info(f"[Segment {i+1}] Dịch: {source_lang} → {target_lang}")
                 else:
                     translated_text = segment.text
-                    logging.info(f"[Segment {i+1}] Không cần dịch.")
 
-                # --- Tạo file audio bằng TTS (Google hoặc Edge) ---
+                # --- Tạo audio ---
                 audio_path = os.path.join(temp_dir, f"audio_{i}.mp3")
-                try:
-                    generate_audio(
-                        text=translated_text,
-                        lang=target_lang,
-                        voice=voice,
-                        output_path=audio_path,
-                        engine=tts_engine
-                    )
-                except Exception as e:
-                    flash(f"Không tạo được audio cho đoạn {i + 1}: {e}")
-                    logging.error(f"[Segment {i+1}] TTS lỗi: {e}", exc_info=True)
-                    continue
+                generate_audio(
+                    text=translated_text,
+                    lang=target_lang,
+                    voice=voice,
+                    output_path=audio_path,
+                    engine=tts_engine
+                )
 
                 if not os.path.exists(audio_path):
-                    flash(f"Không tồn tại file audio đoạn {i + 1}")
+                    flash(f"Không tạo được audio cho đoạn {i + 1}")
                     continue
 
                 # --- Resize ảnh ---
@@ -261,14 +306,12 @@ def export_video(video_id):
                     target_ratio = target_size[0] / target_size[1]
 
                     if img_ratio > target_ratio:
-                        # Cắt ngang
                         new_height = target_size[1]
                         new_width = int(new_height * img_ratio)
                         img = img.resize((new_width, new_height), PILImage.Resampling.LANCZOS)
                         left = (new_width - target_size[0]) // 2
                         img = img.crop((left, 0, left + target_size[0], target_size[1]))
                     else:
-                        # Cắt dọc
                         new_width = target_size[0]
                         new_height = int(new_width / img_ratio)
                         img = img.resize((new_width, new_height), PILImage.Resampling.LANCZOS)
@@ -278,22 +321,56 @@ def export_video(video_id):
                     resized_img_path = os.path.join(temp_dir, f"resized_{i}.jpg")
                     img.save(resized_img_path, quality=95)
 
-                # --- Tạo clip hình + tiếng ---
+                # --- Ghép ảnh + audio ---
                 audio_clip = AudioFileClip(audio_path)
                 image_clip = ImageClip(resized_img_path).with_duration(audio_clip.duration).with_audio(audio_clip)
-                clips.append(image_clip)
+
+                # --- Chèn text nếu được yêu cầu ---
+                sentence_clips = []
+                if show_text:
+                    sentence_chunks = split_text(translated_text, max_length=100, by="sentence")
+                    sentence_duration = audio_clip.duration / max(1, len(sentence_chunks))
+
+                    for idx, chunk in enumerate(sentence_chunks):
+                        txt_clip = TextClip(
+                            text=chunk,
+                            font_size=font_size,
+                            font=font_used,
+                            color="white",
+                            bg_color=bg_color if text_method == "caption" else None,
+                            stroke_width=stroke_width  if text_method == "caption" else 0,
+                            # stroke_color=stroke_color if text_method == "caption" else None,
+                            size=(target_size[0] * 80 // 100, None),
+                            method=text_method
+                        ).with_position(lambda t: ("center", target_size[1] - 150)) \
+                         .with_start(idx * sentence_duration) \
+                         .with_duration(sentence_duration)
+
+                        # Optional: hiệu ứng fade
+                        txt_clip = FadeIn(0.3).apply(txt_clip)
+                        txt_clip = FadeOut(0.3).apply(txt_clip)
+
+                        sentence_clips.append(txt_clip)
+
+                # --- Tổng hợp clip ---
+                composite = CompositeVideoClip([image_clip] + sentence_clips, size=target_size).with_duration(audio_clip.duration)
+                clips.append(composite)
+
+                # --- Giải phóng ---
+                for clip in sentence_clips:
+                    clip.close()
+                image_clip.close()
 
             except Exception as seg_error:
                 logging.error(f"[Segment {i+1}] Lỗi xử lý: {seg_error}", exc_info=True)
-                flash(f"Lỗi xử lý đoạn {i + 1}: {seg_error}")
+                flash(f"Lỗi đoạn {i + 1}: {seg_error}")
                 continue
 
-        # --- Kiểm tra nếu không tạo được đoạn nào ---
+        # --- Kết thúc ---
         if not clips:
             flash("Không thể tạo video vì lỗi ở tất cả các đoạn.")
             return redirect(url_for('video.index'))
 
-        # --- Ghép video ---
         exports_dir = os.path.join(basedir, 'exports')
         os.makedirs(exports_dir, exist_ok=True)
 
@@ -318,9 +395,16 @@ def export_video(video_id):
             logging.error(f"Lỗi khi xuất video: {e}", exc_info=True)
             flash(f"Lỗi khi xuất video: {e}")
             return redirect(url_for('video.index'))
+        finally:
+            final_clip.close()
+            for clip in clips:
+                if clip.audio:
+                    try:
+                        clip.audio.close()
+                    except Exception:
+                        pass
 
         return send_file(output_path, as_attachment=True)
-
 
 @video_bp.route('/api/test-voice', methods=['POST'])
 def test_voice():
@@ -388,3 +472,26 @@ def create_audio():
         logging.error(f"Lỗi tạo audio: {e}", exc_info=True)
         flash(f"Lỗi tạo audio: {e}")
         return redirect(url_for("video.index"))
+
+
+@video_bp.route('/api/preview-font', methods=['POST'])
+def preview_font():
+    data = request.get_json()
+    text = data.get("text", "")
+    font_path = data.get("font", "")
+    
+    if not text or not font_path:
+        return "Missing text or font", 400
+
+    try:
+        font = ImageFont.truetype(font_path, size=48)
+        image = Image.new("RGB", (1000, 200), color="white")
+        draw = ImageDraw.Draw(image)
+        draw.text((10, 50), text, font=font, fill="black")
+
+        img_io = BytesIO()
+        image.save(img_io, "PNG")
+        img_io.seek(0)
+        return send_file(img_io, mimetype="image/png")
+    except Exception as e:
+        return f"Error rendering font: {e}", 500

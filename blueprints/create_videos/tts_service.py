@@ -8,13 +8,17 @@ from pydub import AudioSegment  # pip install pydub
 import os
 from textwrap import wrap
 
-# Chia văn bản dài thành nhiều đoạn nhỏ
-def split_text(text, max_length=200):
+def split_text(text, max_length=200, by="chunk"):
     import re
     from textwrap import wrap
 
-    # Cắt theo câu để giữ nghĩa tự nhiên
-    sentences = re.split(r'(?<=[.!?])\s+', text)
+    if by == "sentence":
+        # ⚙️ Chia văn bản thành từng câu theo dấu kết thúc
+        sentences = re.split(r'(?<=[.!?…])\s+', text)
+        return [s.strip() for s in sentences if s.strip()]
+
+    # Mặc định: chia đoạn vừa phải, ưu tiên giữ nghĩa
+    sentences = re.split(r'(?<=[.!?…])\s+', text)
     chunks = []
     current_chunk = ""
 
@@ -29,7 +33,7 @@ def split_text(text, max_length=200):
     if current_chunk.strip():
         chunks.append(current_chunk.strip())
 
-    # Xử lý những đoạn vẫn quá dài (do không có dấu câu)
+    # Chia thêm nếu vẫn quá dài
     final_chunks = []
     for idx, chunk in enumerate(chunks):
         if len(chunk) > max_length:

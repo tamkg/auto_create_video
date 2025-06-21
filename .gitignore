@@ -2,6 +2,7 @@ exports/
 data.db
 __pycache__/
 static/uploads/
+static/fonts/
 .env
 migrations
 downloads/

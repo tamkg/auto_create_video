@@ -5,11 +5,9 @@
 {% block head_extra %}
 <style>
     body {
-        /* max-width: 900px; */
-        margin: auto;
-        /* padding: 20px; */
         background-color: #f9f9f9;
     }
+
     .settings-popup {
         display: none;
         position: absolute;
@@ -23,8 +21,13 @@
         z-index: 100;
         width: 280px;
     }
+
     .settings-popup.active {
         display: block;
+    }
+
+    .video-item {
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
     }
 </style>
 {% endblock %}
@@ -40,7 +43,7 @@
 <a href="{{ url_for('video.create_video') }}" class="btn btn-success mb-4">+ Tạo Video Mới</a>
 
 {% for video in videos %}
-<div class="card mb-4 shadow-sm video-item" data-title="{{ video.title|lower }}" data-id="{{ video.id }}">
+<div class="card mb-4 video-item" data-title="{{ video.title|lower }}" data-id="{{ video.id }}">
     <div class="card-body position-relative">
         <h2 class="card-title h5">{{ video.title }}</h2>
         <p><strong>ID:</strong> {{ video.id }}</p>
@@ -49,101 +52,148 @@
         <a href="{{ url_for('video.edit_video', video_id=video.id) }}" class="btn btn-success me-2">Sửa</a>
 
         <div class="export-section mt-3 p-3 bg-light rounded">
-<form action="{{ url_for('video.export_video', video_id=video.id) }}" method="GET" class="row g-3 align-items-center">
+            <form action="{{ url_for('video.export_video', video_id=video.id) }}" method="GET" class="row g-3 align-items-center">
+                <div class="col-md-4">
+                    <label for="show_text_{{ video.id }}" class="form-label">Chèn văn bản vào video?</label>
+                    <select name="show_text" id="show_text_{{ video.id }}" class="form-select show-text-toggle" data-video-id="{{ video.id }}">
+                        <option value="no">❌ Không</option>
+                        <option value="yes">✅ Có</option>
+                    </select>
+                </div>
 
-    <!-- Chọn TTS Engine -->
-    <div class="col-md-4">
-        <label for="tts_type_{{ video.id }}" class="form-label">Chọn TTS:</label>
-        <select name="tts_type" id="tts_type_{{ video.id }}" class="form-select tts-type-select" data-video-id="{{ video.id }}">
-            <option value="google">Google TTS</option>
-            <option value="edge">Edge TTS</option>
-        </select>
-    </div>
+                <!-- Chế độ hiển thị văn bản -->
+                <div class="col-md-4 text-settings d-none" id="text-settings-{{ video.id }}">
+                    <label for="text_method_{{ video.id }}" class="form-label">Kiểu hiển thị văn bản:</label>
+                    <select name="text_method" id="text_method_{{ video.id }}" class="form-select">
+                        <option value="caption">📝 Caption (Tự động chia dòng)</option>
+                        <option value="label">🔖 Label (Một dòng duy nhất)</option>
+                    </select>
 
-    <!-- Ngôn ngữ luôn hiện -->
-    <div class="col-md-4">
-        <label for="lang_{{ video.id }}" class="form-label">Ngôn ngữ đích (Dùng để dịch):</label>
-        <select name="lang" id="lang_{{ video.id }}" class="form-select">
-            {% for code, name in languages.items() %}
-            <option value="{{ code }}">{{ name }}</option>
-            {% endfor %}
-        </select>
-    </div>
+                    <div class="mt-2">
+                        <label for="font_{{ video.id }}" class="form-label">Font chữ:</label>
+                        <select name="font" id="font_{{ video.id }}" class="form-select">
+                            {% for font_name in fonts %}
+                                <option value="{{ font_name }}">{{ font_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
-    <!-- Bảng chọn giọng (Edge TTS) -->
-    <div class="col-12 tts-edge tts-toggle d-none" id="edge-voice-{{ video.id }}">
-        <label class="form-label fw-bold">Chọn giọng đọc (Edge TTS):</label>
+                    <!-- Font size -->
+                    <div class="mt-2">
+                        <label for="font_size_{{ video.id }}" class="form-label">Cỡ chữ (font size):</label>
+                        <input type="number" name="font_size" id="font_size_{{ video.id }}" class="form-control" min="10" max="100" value="40">
+                    </div>
 
-        <div class="row mb-2">
-            <div class="col-md-6">
-                <input type="text" name="filter_name" class="form-control filter-name-input" placeholder="Lọc theo tên (ví dụ: vi)">
-            </div>
-            <div class="col-md-3">
-                <select name="filter_gender" class="form-select filter-gender-select">
-                    <option value="">Tất cả</option>
-                    <option value="Female">Nữ</option>
-                    <option value="Male">Nam</option>
-                </select>
-            </div>
+                    <!-- Stroke color -->
+                    <!-- <div class="mt-2">
+                        <label for="stroke_color_{{ video.id }}" class="form-label">Màu viền chữ (stroke color):</label>
+                        <input type="color" name="stroke_color" id="stroke_color_{{ video.id }}" class="form-control form-control-color" value="#000000" title="Chọn màu viền chữ">
+                    </div> -->
+
+                    <!-- Stroke width -->
+                    <div class="mt-2">
+                        <label for="stroke_width_{{ video.id }}" class="form-label">Độ dày viền chữ (stroke width):</label>
+                        <input type="number" name="stroke_width" id="stroke_width_{{ video.id }}" class="form-control" min="0" max="10" value="1">
+                    </div>
+
+                    <!-- Background color -->
+                    <div class="mt-2">
+                        <label for="bg_color_{{ video.id }}" class="form-label">Màu nền văn bản (chỉ áp dụng cho Caption):</label>
+                        <input type="color" name="bg_color" id="bg_color_{{ video.id }}" class="form-control form-control-color" value="#000000" title="Chọn màu nền cho văn bản">
+                    </div>
+
+                    <div class="mt-2">
+                        <label class="form-label">Nội dung font xem trước:</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control preview-text-input" data-video-id="{{ video.id }}" placeholder="Nhập nội dung mẫu">
+                            <button type="button" class="btn btn-outline-secondary preview-font-btn" data-video-id="{{ video.id }}">👁 Xem trước font</button>
+                        </div>
+                        <div class="mt-2 preview-font-result" id="preview-result-{{ video.id }}"></div>
+                    </div>
+                </div>
+
+                <!-- Chọn TTS Engine -->
+                <div class="col-md-4">
+                    <label for="tts_type_{{ video.id }}" class="form-label">Chọn TTS:</label>
+                    <select name="tts_type" id="tts_type_{{ video.id }}" class="form-select tts-type-select" data-video-id="{{ video.id }}">
+                        <option value="google">Google TTS</option>
+                        <option value="edge">Edge TTS</option>
+                    </select>
+                </div>
+
+                <!-- Ngôn ngữ đích -->
+                <div class="col-md-4">
+                    <label for="lang_{{ video.id }}" class="form-label">Ngôn ngữ đích:</label>
+                    <select name="lang" id="lang_{{ video.id }}" class="form-select">
+                        {% for code, name in languages.items() %}
+                            <option value="{{ code }}">{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Bảng giọng đọc Edge TTS -->
+                <div class="col-12 tts-edge tts-toggle d-none" id="edge-voice-{{ video.id }}">
+                    <label class="form-label fw-bold">Chọn giọng đọc (Edge TTS):</label>
+
+                    <div class="row mb-2">
+                        <div class="col-md-6">
+                            <input type="text" name="filter_name" class="form-control filter-name-input" placeholder="Lọc theo tên (ví dụ: vi)">
+                        </div>
+                        <div class="col-md-3">
+                            <select name="filter_gender" class="form-select filter-gender-select">
+                                <option value="">Tất cả</option>
+                                <option value="Female">Nữ</option>
+                                <option value="Male">Nam</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                        <table class="table table-bordered table-sm voice-table">
+                            <thead>
+                                <tr>
+                                    <th>Chọn</th>
+                                    <th>Tên</th>
+                                    <th>Giới tính</th>
+                                    <th>Categories</th>
+                                    <th>Test</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for voice in edge_voices %}
+                                <tr>
+                                    <td><input type="radio" name="voice" value="{{ voice.Name }}" {% if loop.first %}checked{% endif %}></td>
+                                    <td class="voice-name">{{ voice.Name }}</td>
+                                    <td class="voice-gender">{{ voice.Gender }}</td>
+                                    <td class="content-categories">{{ voice.ContentCategories }}</td>
+                                    <td><button type="button" class="btn btn-sm btn-outline-secondary test-voice-btn" data-voice="{{ voice.Name }}" data-lang="{{ voice.Locale }}" data-text="Xin chào! Đây là bản kiểm tra giọng nói.">🔊 Test</button></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tỉ lệ video -->
+                <div class="col-md-4">
+                    <label for="ratio_{{ video.id }}" class="form-label">Tỉ lệ video:</label>
+                    <select name="ratio" id="ratio_{{ video.id }}" class="form-select">
+                        <option value="horizontal">🎬 16:9 (YouTube)</option>
+                        <option value="vertical">📱 9:16 (TikTok, Shorts)</option>
+                        <option value="square">⬛ 1:1 (Instagram)</option>
+                    </select>
+                </div>
+
+                <!-- Nút Export -->
+                <div class="col-12">
+                    <button type="submit" class="btn btn-purple btn-primary">🎞 Export Video</button>
+                </div>
+            </form>
         </div>
 
-        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
-            <table class="table table-bordered table-sm voice-table">
-                <thead>
-                    <tr>
-                        <th>Chọn</th>
-                        <th>Tên</th>
-                        <th>Giới tính</th>
-                        <th>Categories</th>
-                        <th>Test</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for voice in edge_voices %}
-                <tr>
-                    <td>
-                        <input type="radio" name="voice" value="{{ voice.Name }}"
-                            {% if loop.first %}checked{% endif %}>
-                    </td>
-                    <td class="voice-name">{{ voice.Name }}</td>
-                    <td class="voice-gender">{{ voice.Gender }}</td>
-                    <td class="content-categories">{{ voice.ContentCategories }}</td>
-                        <td>
-                    <button type="button" class="btn btn-sm btn-outline-secondary test-voice-btn"
-                            data-voice="{{ voice.Name }}"
-                            data-lang="{{ voice.Locale }}"
-                            data-text="Xin chào! Đây là bản kiểm tra giọng nói.">
-                        🔊 Test
-                    </button>
-                </td>
-                </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- Tỉ lệ video -->
-    <div class="col-md-4">
-        <label for="ratio_{{ video.id }}" class="form-label">Tỉ lệ video:</label>
-        <select name="ratio" id="ratio_{{ video.id }}" class="form-select">
-            <option value="horizontal">🎬 16:9 (YouTube)</option>
-            <option value="vertical">📱 9:16 (TikTok, Shorts)</option>
-            <option value="square">⬛ 1:1 (Instagram)</option>
-        </select>
-    </div>
-
-    <!-- Nút Export -->
-    <div class="col-12">
-        <button type="submit" class="btn btn-purple btn-primary">🎞 Export Video</button>
-    </div>
-</form>
-</div>
-
-
-
-        <form action="{{ url_for('video.delete_video', video_id=video.id) }}" method="POST" style="display:inline;">
-            <button type="submit" class="btn btn-danger mt-3" onclick="return confirm('Bạn có chắc muốn xoá video này không?');">🗑 Xoá</button>
+        <!-- Xoá video -->
+        <form action="{{ url_for('video.delete_video', video_id=video.id) }}" method="POST" class="mt-3">
+            <button type="submit" class="btn btn-danger" onclick="return confirm('Bạn có chắc muốn xoá video này không?');">🗑 Xoá</button>
         </form>
     </div>
 </div>
@@ -161,91 +211,109 @@
         });
     });
 
-    // Lọc bảng giọng đọc
-    document.querySelectorAll(".tts-edge").forEach(section => {
-        const filterName = section.querySelector(".filter-name-input");
-        const filterGender = section.querySelector(".filter-gender-select");
-        const rows = section.querySelectorAll("tbody tr");
-
-        function applyFilter() {
-            const nameVal = filterName.value.toLowerCase();
-            const genderVal = filterGender.value;
-
-            rows.forEach(row => {
-                const voiceName = row.querySelector(".voice-name").textContent.toLowerCase();
-                const voiceGender = row.querySelector(".voice-gender").textContent;
-                const match = voiceName.includes(nameVal) && (genderVal === "" || voiceGender === genderVal);
-                row.style.display = match ? "" : "none";
-            });
-        }
-
-        filterName?.addEventListener("input", applyFilter);
-        filterGender?.addEventListener("change", applyFilter);
-    });
-</script>
-
-<script>
-document.querySelectorAll('.test-voice-btn').forEach(button => {
-    button.addEventListener('click', function () {
-        const voice = this.dataset.voice;
-        const lang = this.dataset.lang;
-        const text = this.dataset.text;
-
-        this.disabled = true;
-        this.dataset.originalText = this.innerText;
-        this.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Đang phát...`;
-
-
-        fetch(`/create_video/api/test-voice`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-                voice: voice,
-                lang: lang,
-                text: text,
-                engine: voice ? 'edge' : 'google'  // Tự động chọn engine theo voice
-            })
-        })
-        .then(res => {
-            if (!res.ok) throw new Error("Tải không thành công");
-            return res.blob();
-        })
-        .then(blob => {
-            const url = URL.createObjectURL(blob);
-            const audio = new Audio(url);
-            audio.play();
-            audio.onended = () => {
-                this.disabled = false;
-                this.innerHTML = this.dataset.originalText || "🔊 Test";
-            };
-        })
-        .catch(err => {
-            alert("Lỗi khi test giọng: " + err.message);
-            this.disabled = false;
-            this.innerHTML = this.dataset.originalText || "🔊 Test";
+    document.getElementById('searchInput').addEventListener('input', function () {
+        const searchTerm = this.value.toLowerCase();
+        const videoItems = document.querySelectorAll('.video-item');
+        
+        videoItems.forEach(item => {
+            const title = item.getAttribute('data-title');
+            const id = item.getAttribute('data-id');
+            item.style.display = (title.includes(searchTerm) || id.includes(searchTerm)) ? '' : 'none';
         });
     });
-});
 
-// Lắng nghe sự kiện input của ô tìm kiếm
-document.getElementById('searchInput').addEventListener('input', function () {
-    const searchTerm = this.value.toLowerCase(); // Chuyển chữ thường để so sánh không phân biệt hoa thường
-    const videoItems = document.querySelectorAll('.video-item'); // Lấy tất cả các video item
-    
-    videoItems.forEach(item => {
-        const title = item.getAttribute('data-title'); // Lấy tiêu đề video
-        const id = item.getAttribute('data-id'); // Lấy ID video
-
-        // Kiểm tra nếu tiêu đề hoặc ID chứa từ khóa tìm kiếm
-        if (title.includes(searchTerm) || id.includes(searchTerm)) {
-            item.style.display = ''; // Hiển thị video nếu tìm thấy
-        } else {
-            item.style.display = 'none'; // Ẩn video nếu không tìm thấy
-        }
+    document.querySelectorAll(".show-text-toggle").forEach(select => {
+        select.addEventListener("change", function () {
+            const videoId = this.dataset.videoId;
+            const settingsBlock = document.getElementById("text-settings-" + videoId);
+            settingsBlock.classList.toggle("d-none", this.value !== "yes");
+        });
     });
-});
-</script>
 
+    document.querySelectorAll(".preview-font-btn").forEach(button => {
+        button.addEventListener("click", () => {
+            const videoId = button.dataset.videoId;
+            const input = document.querySelector(`.preview-text-input[data-video-id="${videoId}"]`);
+            const fontSelect = document.querySelector(`#font_${videoId}`);
+            const previewResult = document.getElementById(`preview-result-${videoId}`);
+            const text = input.value.trim();
+            const font = fontSelect.value;
+
+            if (!text) {
+                alert("Nhập nội dung để xem trước.");
+                return;
+            }
+
+            button.disabled = true;
+            button.innerText = "Đang tạo ảnh...";
+
+            fetch(`/create_video/api/preview-font`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text, font: font })
+            })
+            .then(res => res.blob())
+            .then(blob => {
+                const url = URL.createObjectURL(blob);
+                previewResult.innerHTML = `<img src="${url}" class="img-fluid" alt="Preview font">`;
+            })
+            .catch(err => alert("Lỗi xem trước font: " + err.message))
+            .finally(() => {
+                button.disabled = false;
+                button.innerText = "👁 Xem trước font";
+            });
+        });
+    });
+
+    document.querySelectorAll('.test-voice-btn').forEach(button => {
+        button.addEventListener('click', function () {
+            const voice = this.dataset.voice;
+            const lang = this.dataset.lang;
+            const text = this.dataset.text;
+
+            this.disabled = true;
+            this.dataset.originalText = this.innerText;
+            this.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Đang phát...`;
+
+            fetch(`/create_video/api/test-voice`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: new URLSearchParams({
+                    voice: voice,
+                    lang: lang,
+                    text: text,
+                    engine: voice ? 'edge' : 'google'
+                })
+            })
+            .then(res => {
+                if (!res.ok) throw new Error("Tải không thành công");
+                return res.blob();
+            })
+            .then(blob => {
+                const url = URL.createObjectURL(blob);
+                const audio = new Audio(url);
+                audio.play();
+                audio.onended = () => {
+                    this.disabled = false;
+                    this.innerHTML = this.dataset.originalText || "🔊 Test";
+                };
+            })
+            .catch(err => {
+                alert("Lỗi khi test giọng: " + err.message);
+                this.disabled = false;
+                this.innerHTML = this.dataset.originalText || "🔊 Test";
+            });
+        });
+    });
+
+
+document.querySelectorAll(`#text_method_${videoId}`).forEach(select => {
+    select.addEventListener("change", function () {
+        const bgColorInput = document.querySelector(`#bg_color_${videoId}`).closest('.mt-2');
+        bgColorInput.style.display = this.value === "caption" ? "block" : "none";
+    });
+});    
+</script>
 {% endblock %}
