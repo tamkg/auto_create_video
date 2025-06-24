@@ -75,19 +75,29 @@ def create_video():
                     order_img = 0
                     for file in files:
                         if file and file.filename != '':
-                            filename = secure_filename(file.filename)
-                            filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+                            # Lấy phần mở rộng và tạo tên file ngẫu nhiên bằng uuid
+                            ext = os.path.splitext(file.filename)[1]
+                            filename = f"{uuid.uuid4().hex}{ext}"
+
+                            # Đường dẫn lưu file
+                            upload_folder = current_app.config['UPLOAD_FOLDER']
+                            filepath = os.path.join(upload_folder, filename)
+
+                            # Lưu file vào thư mục
                             file.save(filepath)
 
                             order_img += 1
-                            image = Image(segment_id=segment.id,
-                                          file_path=f'static/uploads/{filename}',
-                                          order_index=order_img)
+                            image = Image(
+                                segment_id=segment.id,
+                                file_path=f'static/uploads/{filename}',
+                                order_index=order_img
+                            )
                             db.session.add(image)
 
         db.session.commit()
         flash('Tạo video thành công')
         return redirect(url_for('video.index'))
+
 
     return render_template('new_video.html')
 
@@ -347,8 +357,8 @@ def export_video(video_id):
                          .with_duration(sentence_duration)
 
                         # Optional: hiệu ứng fade
-                        txt_clip = FadeIn(0.3).apply(txt_clip)
-                        txt_clip = FadeOut(0.3).apply(txt_clip)
+                        txt_clip = FadeIn(0.1).apply(txt_clip)
+                        txt_clip = FadeOut(0.1).apply(txt_clip)
 
                         sentence_clips.append(txt_clip)
 
