@@ -23,6 +23,10 @@ from io import BytesIO
 
 from .fonts import find_fonts
 
+from .help_func import generate_subtitles
+import zipfile
+
+
 video_bp = Blueprint('video', __name__, template_folder="templates")
 
 @video_bp.route("/")
@@ -227,6 +231,8 @@ def export_video(video_id):
 
     stroke_color = request.args.get("stroke_color") or None
     stroke_width = int(request.args.get("stroke_width") or 0)
+
+
 
     # --- Kiểm tra hợp lệ ---
     if target_lang not in tts_langs():

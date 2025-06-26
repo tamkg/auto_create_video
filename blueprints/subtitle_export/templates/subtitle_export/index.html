@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Export Subtitles{% endblock %}
+
+{% block content %}
+<h2 class="text-center mt-4">🎬 Tạo Phụ Đề Từ Video</h2>
+<p class="text-center text-muted">Tải <strong>nhiều video</strong> và chọn định dạng xuất riêng cho từng file</p>
+
+<div class="container mt-5" style="max-width: 800px;">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="mb-3">
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('subtitle_export.process') }}" enctype="multipart/form-data" id="uploadForm">
+        <div class="mb-3">
+            <label for="video_file" class="form-label">📁 Chọn video (nhiều file):</label>
+            <input class="form-control" type="file" id="video_file" name="video_files[]" accept="video/*" multiple required>
+            <small id="fileCount" class="text-muted"></small>
+        </div>
+
+        <div id="fileListContainer" class="mb-3"></div>
+
+        <button type="submit" class="btn btn-primary w-100">🚀 Tạo Phụ Đề</button>
+    </form>
+
+    <!-- Spinner loading -->
+    <div id="loadingSpinner" class="text-center mt-4 d-none">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Đang xử lý...</span>
+        </div>
+        <p class="mt-2 text-muted">Đang tạo phụ đề... Vui lòng chờ!</p>
+    </div>
+
+    {% if zip_path %}
+    <div class="text-center mt-4">
+        <a class="btn btn-success" href="{{ url_for('static', filename=zip_path) }}" download>
+            ⬇️ Tải toàn bộ phụ đề (.zip)
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const fileInput = document.getElementById("video_file");
+    const fileListContainer = document.getElementById("fileListContainer");
+    const form = document.getElementById("uploadForm");
+    const spinner = document.getElementById("loadingSpinner");
+
+    const filesData = [];
+
+    fileInput.addEventListener("change", () => {
+        fileListContainer.innerHTML = ""; // Clear before rendering
+        filesData.length = 0;
+
+        document.getElementById("fileCount").textContent = `Đã chọn ${fileInput.files.length} video`;
+
+
+        Array.from(fileInput.files).forEach((file, index) => {
+            const fileId = `file-${index}`;
+            filesData.push(file);
+
+            const wrapper = document.createElement("div");
+            wrapper.className = "card p-3 mb-2";
+
+            wrapper.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <strong>${file.name}</strong>
+                    <button type="button" class="btn btn-sm btn-danger" onclick="removeFile(${index})">X</button>
+                </div>
+                <div class="mt-2">
+                    <label>Định dạng phụ đề:</label>
+                    <select class="form-select format-select" name="formats[]">
+                        <option value="srt">.srt</option>
+                        <option value="lrc">.lrc</option>
+                        <option value="ass">.ass</option>
+                    </select>
+                </div>
+                <div class="mt-2">
+                    <label>Kiểu phụ đề:</label>
+                    <select class="form-select" name="modes[]">
+                        <option value="normal">Bình thường</option>
+                        <option value="word">Từng từ</option>
+                    </select>
+                </div>
+            `;
+            fileListContainer.appendChild(wrapper);
+        });
+    });
+
+    window.removeFile = (index) => {
+        filesData.splice(index, 1);
+        const dt = new DataTransfer();
+        filesData.forEach(file => dt.items.add(file));
+        fileInput.files = dt.files;
+        fileInput.dispatchEvent(new Event("change"));
+    };
+
+    form.addEventListener("submit", () => {
+        spinner.classList.remove("d-none");
+    });
+});
+</script>
+{% endblock %}
