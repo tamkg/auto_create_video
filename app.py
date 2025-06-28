@@ -15,6 +15,7 @@ from blueprints.setup_video_prompt.routes import setup_video_prompt_bp
 from blueprints.audiomatches.routes import audiomatch_bp
 from blueprints.frame_extractor.routes import frame_extractor_bp
 from blueprints.subtitle_export.routes import subtitle_export_bp
+from blueprints.video_merger.routes import video_merger_bp
 
 from scheduler import start_scheduler
 
@@ -58,6 +59,7 @@ def create_app():
     app.register_blueprint(audiomatch_bp, url_prefix='/audiomatch_bp')
     app.register_blueprint(frame_extractor_bp, url_prefix='/frame_extractor')
     app.register_blueprint(subtitle_export_bp, url_prefix='/subtitle_export')
+    app.register_blueprint(video_merger_bp, url_prefix="/video_merger")
 
     with app.app_context():
         db.create_all()

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Kết quả Gộp Video{% endblock %}
+
+{% block content %}
+<h2 class="text-center mb-4">🎉 Video Đã Gộp Thành Công</h2>
+
+<div class="text-center mb-4">
+  <video width="640" height="360" controls>
+    <source src="{{ video_url }}" type="video/mp4">
+    Trình duyệt của bạn không hỗ trợ thẻ video.
+  </video>
+</div>
+
+<div class="text-center mb-3">
+  <p><strong>📼 Đường dẫn:</strong> <code>{{ video_url }}</code></p>
+  <p><strong>⏱ Thời lượng:</strong> {{ duration }} giây</p>
+
+  <a href="{{ video_url }}" class="btn btn-success" download>
+    ⬇️ Tải Video
+  </a>
+  <a href="{{ url_for('video_merger.index') }}" class="btn btn-outline-primary ms-2">
+    🔄 Trở về trang gộp video
+  </a>
+</div>
+{% endblock %}

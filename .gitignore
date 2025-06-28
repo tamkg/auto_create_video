@@ -11,3 +11,5 @@ audios/
 uploads/thumbnails/
 uploads/videos/
 static/frames/
+static/outputs/
+static/videos/

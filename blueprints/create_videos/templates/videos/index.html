@@ -184,6 +184,18 @@
                     </select>
                 </div>
 
+                <!-- Chọn định dạng phụ đề -->
+                <div class="col-md-4">
+                    <label for="sub_format_{{ video.id }}" class="form-label">Tạo phụ đề?</label>
+                    <select name="sub_format" id="sub_format_{{ video.id }}" class="form-select">
+                        <option value="">❌ Không</option>
+                        <option value="srt">📄 .srt</option>
+                        <option value="ass">🎬 .ass</option>
+                        <option value="lrc">🎵 .lrc</option>
+                        <option value="all">📦 Tất cả</option>
+                    </select>
+                </div>
+
                 <!-- Nút Export -->
                 <div class="col-12">
                     <button type="submit" class="btn btn-purple btn-primary">🎞 Export Video</button>

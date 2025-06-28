@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Gộp Video Tự Động{% endblock %}
+
+{% block content %}
+<h2 class="mb-4 text-center">🧩 Gộp Video Tự Động</h2>
+
+<!-- 🔗 Link chuyển qua trang quản lý video -->
+<div class="text-end mb-3">
+    <a href="{{ url_for('video_merger.manage_videos') }}" class="btn btn-outline-secondary">
+        ⚙️ Quản lý video clip
+    </a>
+</div>
+
+<form method="POST">
+    <div class="mb-3">
+        <label for="category_id" class="form-label">Chọn danh mục video:</label>
+        <select class="form-select" id="category_id" name="category_id" required>
+            {% for cat in categories %}
+                <option value="{{ cat.id }}">{{ cat.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label for="ratio" class="form-label">Chọn tỷ lệ khung hình:</label>
+        <select class="form-select" id="ratio" name="ratio" required>
+            <option value="16:9">16:9 (ngang)</option>
+            <option value="9:16">9:16 (dọc)</option>
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label for="duration" class="form-label">Thời lượng mong muốn (giây):</label>
+        <input type="number" class="form-control" id="duration" name="duration" placeholder="Ví dụ: 600" required>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Gộp video</button>
+</form>
+{% if videos %}
+  <hr>
+  <h4>Kết quả từ danh mục <code>{{ selected_category.name }}</code>:</h4>
+
+  <div class="border rounded p-3 mb-3" style="max-height: 300px; overflow-y: auto;">
+    <ul class="list-group list-group-flush">
+      {% for video in videos %}
+        <li class="list-group-item">
+          {{ video.filename }} —
+          {% if video.cut_to is defined %}
+            <strong>{{ video.cut_to }}s</strong>
+            <span class="badge bg-info text-dark">✂️ Cắt từ {{ video.duration | round(1) }}s</span>
+          {% else %}
+            {{ video.duration | round(1) }}s
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+
+<form method="POST" action="{{ url_for('video_merger.generate_video') }}">
+  <div class="row">
+    <div class="col-md-6 mb-3">
+      <label for="output_name" class="form-label">📁 Tên file xuất:</label>
+      <input type="text" class="form-control" name="output_name" id="output_name" placeholder="merged_output.mp4">
+    </div>
+
+    <div class="col-md-6 mb-3">
+      <label for="fps" class="form-label">🎞️ FPS:</label>
+      <select class="form-select" name="fps" id="fps" required>
+        <option value="24">24 FPS</option>
+        <option value="30" selected>30 FPS</option>
+        <option value="60">60 FPS</option>
+      </select>
+    </div>
+
+    <div class="col-md-6 mb-3">
+      <label for="resolution" class="form-label">🖥️ Độ phân giải:</label>
+      <select class="form-select" name="resolution" id="resolution">
+        <option value="keep" selected>📏 Giữ nguyên (không scale)</option>
+        <option value="1920x1080">1920x1080 (16:9)</option>
+        <option value="1080x1920">1080x1920 (9:16)</option>
+        <option value="1080x1080">1080x1080 (1:1)</option>
+      </select>
+    </div>
+
+    <div class="col-md-6 mb-3">
+      <label for="aspect_ratio" class="form-label">📐 Tỉ lệ khung hình (nếu không chọn độ phân giải):</label>
+      <select class="form-select" name="aspect_ratio" id="aspect_ratio">
+        <option value="keep" selected>📏 Giữ nguyên (không scale)</option>
+        <option value="16:9">16:9</option>
+        <option value="9:16">9:16</option>
+        <option value="1:1">1:1</option>
+      </select>
+    </div>
+
+    <div class="col-md-6 mb-3">
+      <label for="codec" class="form-label">🎥 Codec:</label>
+      <select class="form-select" name="codec" id="codec" required>
+        <option value="libx264" selected>libx264 (phổ biến)</option>
+        <option value="h264_qsv">h264_qsv (Intel GPU)</option>
+        <option value="hevc_qsv">hevc_qsv (Intel GPU)</option>
+      </select>
+    </div>
+
+    <div class="col-md-6 mb-3">
+      <label for="preset" class="form-label">⚙️ Preset:</label>
+      <select class="form-select" name="preset" id="preset" required>
+        <option value="ultrafast">ultrafast</option>
+        <option value="superfast">superfast</option>
+        <option value="fast" selected>fast</option>
+        <option value="medium">medium</option>
+        <option value="slow">slow</option>
+      </select>
+    </div>
+  </div>
+
+  {% for video in selected_videos %}
+    <input type="hidden" name="video_ids" value="{{ video.id }}">
+    {% if video.cut_to is defined %}
+      <input type="hidden" name="cut_to_{{ video.id }}" value="{{ video.cut_to }}">
+    {% endif %}
+  {% endfor %}
+
+  <div class="col-md-6 mb-3">
+    <label for="keep_audio" class="form-label">🔊 Âm thanh gốc:</label>
+    <select class="form-select" name="keep_audio" id="keep_audio" required>
+      <option value="yes" selected>Giữ nguyên âm thanh</option>
+      <option value="no">Tắt tiếng</option>
+    </select>
+  </div>
+
+  <div class="text-center">
+    <button type="submit" class="btn btn-success">
+      🚀 Tạo video tổng hợp
+    </button>
+  </div>
+</form>
+
+<!-- Script để ẩn/hiện aspect_ratio tùy theo resolution -->
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const resolutionSelect = document.getElementById("resolution");
+    const aspectRatioField = document.getElementById("aspect_ratio");
+    const aspectRatioWrapper = aspectRatioField.closest(".col-md-6");
+
+    function toggleAspectRatio() {
+      if (resolutionSelect.value === "keep") {
+        aspectRatioWrapper.style.display = "block";
+      } else {
+        aspectRatioWrapper.style.display = "none";
+      }
+    }
+
+    resolutionSelect.addEventListener("change", toggleAspectRatio);
+    toggleAspectRatio(); // Gọi ban đầu
+  });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Quản Lý Video{% endblock %}
+
+{% block content %}
+<h2 class="mb-4 text-center">🎬 Quản Lý Video Clip</h2>
+
+<!-- Link quay lại trang Gộp Video -->
+<div class="mb-4 text-start">
+  <a href="{{ url_for('video_merger.index') }}" class="btn btn-outline-secondary">
+    ⬅️ Quay về Gộp Video
+  </a>
+</div>
+
+<!-- Upload form -->
+<div class="card mb-5 shadow-sm">
+  <div class="card-header bg-primary text-white">
+    ⬆️ Upload Video Mới
+  </div>
+  <div class="card-body">
+    <form method="POST" enctype="multipart/form-data">
+      <div class="row g-3">
+        <div class="col-md-5">
+          <input type="file" name="video_files[]" class="form-control" required multiple>
+        </div>
+        <div class="col-md-4">
+          <select name="category" class="form-select">
+            <option value="">-- Chọn hoặc để trống --</option>
+            {% for cat in category_list %}
+              <option value="{{ cat }}">{{ cat }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <button type="submit" class="btn btn-primary w-100">Upload</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Flash messages -->
+<!-- {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %} -->
+
+<!-- Quản lý danh mục -->
+<div class="card mb-5 shadow-sm">
+  <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+    📂 Quản Lý Danh Mục Video
+    <form method="POST" action="{{ url_for('video_merger.add_category') }}" class="d-flex gap-2">
+      <input type="text" name="new_category" class="form-control form-control-sm" placeholder="Thêm danh mục mới" required>
+      <button class="btn btn-light btn-sm">Thêm</button>
+    </form>
+  </div>
+  <div class="card-body">
+    {% if category_list %}
+      <ul class="list-group">
+        {% for cat in category_list %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            {{ cat }}
+            <form method="POST" action="{{ url_for('video_merger.delete_video_category', category_name=cat) }}"
+                  onsubmit="return confirm('Xoá danh mục này? Tất cả video thuộc danh mục sẽ không còn danh mục!');">
+              <button class="btn btn-sm btn-outline-danger">Xoá</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-muted">Chưa có danh mục nào.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Danh sách video -->
+<h5 class="mb-3">📄 Danh sách Video đã upload:</h5>
+<div class="table-responsive">
+  <table class="table table-bordered table-striped align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Tên file</th>
+        <th>Danh mục</th>
+        <th>Tỷ lệ</th>
+        <th>Thời lượng</th>
+        <th>Tải lên</th>
+        <th>Hành động</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for video in videos %}
+      <tr>
+        <td>{{ video.filename }}</td>
+        <td>{{ video.category_clip.name if video.category_clip else '—' }}</td>
+        <td>{{ video.ratio or '—' }}</td>
+        <td>{{ video.duration | round(1) }}s</td>
+        <td>{{ video.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td>
+            <form method="POST" action="{{ url_for('video_merger.delete_video', video_id=video.id) }}"
+                    onsubmit="return confirm('Bạn có chắc muốn xóa video này?');">
+                <button type="submit" class="btn btn-sm btn-danger">Xóa</button>
+            </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

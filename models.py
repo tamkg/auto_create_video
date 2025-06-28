@@ -154,3 +154,30 @@ class AIModelConfig(db.Model):
     active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     prompt_templates = db.relationship('AIPromptTemplate', backref='model_config', lazy=True)    
+
+
+
+class CategoryClip(db.Model):
+    __tablename__ = 'category_clips'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    videos = db.relationship('VideoClip', backref='category_clip', lazy=True)
+
+class VideoClip(db.Model):
+    __tablename__ = 'video_clips'
+
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(255), nullable=False, unique=True)
+    filepath = db.Column(db.String(512), nullable=False)
+
+    # FK → CategoryClip
+    category_id = db.Column(db.Integer, db.ForeignKey('category_clips.id'), nullable=True)
+
+    ratio = db.Column(db.String(10), nullable=True)
+    duration = db.Column(db.Float, nullable=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
