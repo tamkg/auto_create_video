@@ -82,7 +82,7 @@ def manage_videos():
     os.makedirs(upload_folder, exist_ok=True)
 
     if request.method == "POST":
-        files = request.files.getlist("video_files[]")  # Lấy danh sách các file
+        files = request.files.getlist("video_files[]")
         category_name = request.form.get("category", "").strip()
 
         if not files:
@@ -92,8 +92,20 @@ def manage_videos():
                 if file and allowed_file(file.filename):
                     filename = secure_filename(file.filename)
                     save_path = os.path.join(upload_folder, filename)
-                    file.save(save_path)
 
+                    # 👉 Check trước xem file này đã có trong database chưa
+                    existing = VideoClip.query.filter_by(filename=filename).first()
+                    if existing:
+                        flash(f"⚠️ Video '{filename}' đã tồn tại trong hệ thống!", "warning")
+                        continue
+
+                    # 👉 Check xem file đã có trong thư mục chưa (phòng trường hợp trùng file thủ công)
+                    if os.path.exists(save_path):
+                        flash(f"⚠️ File '{filename}' đã tồn tại trên hệ thống file!", "warning")
+                        continue
+
+                    # 👉 Bắt đầu xử lý nếu mọi thứ OK
+                    file.save(save_path)
                     try:
                         clip = VideoFileClip(save_path)
                         width, height = clip.size
@@ -101,28 +113,24 @@ def manage_videos():
                         ratio = "16:9" if width > height else "9:16"
                         clip.close()
 
-                        existing = VideoClip.query.filter_by(filename=filename).first()
-                        if not existing:
-                            category_obj = None
-                            if category_name:
-                                category_obj = CategoryClip.query.filter_by(name=category_name).first()
-                                if not category_obj:
-                                    category_obj = CategoryClip(name=category_name)
-                                    db.session.add(category_obj)
-                                    db.session.commit()
+                        category_obj = None
+                        if category_name:
+                            category_obj = CategoryClip.query.filter_by(name=category_name).first()
+                            if not category_obj:
+                                category_obj = CategoryClip(name=category_name)
+                                db.session.add(category_obj)
+                                db.session.commit()
 
-                            video = VideoClip(
-                                filename=filename,
-                                filepath=save_path,
-                                category_id=category_obj.id if category_obj else None,
-                                ratio=ratio,
-                                duration=duration
-                            )
-                            db.session.add(video)
-                            db.session.commit()
-                            flash(f"✅ Đã thêm video '{filename}'", "success")
-                        else:
-                            flash(f"⚠️ Video '{filename}' đã tồn tại trong hệ thống!", "warning")
+                        video = VideoClip(
+                            filename=filename,
+                            filepath=save_path,
+                            category_id=category_obj.id if category_obj else None,
+                            ratio=ratio,
+                            duration=duration
+                        )
+                        db.session.add(video)
+                        db.session.commit()
+                        flash(f"✅ Đã thêm video '{filename}'", "success")
                     except Exception as e:
                         flash(f"❌ Lỗi đọc video '{filename}': {e}", "danger")
                 else:
@@ -188,10 +196,12 @@ def delete_video(video_id):
 def generate_video():
     print("=== BẮT ĐẦU XỬ LÝ ===")
 
+    # Lấy thông tin từ form
     video_ids = request.form.getlist("video_ids")
-    print(f"[INFO] Danh sách video ID: {video_ids}")
+    raw_output_name = request.form.get("output_name", "").strip()
+    if not raw_output_name:
+        raw_output_name = "merged_output"
 
-    raw_output_name = request.form.get("output_name", "merged_output.mp4")
     raw_output_name = re.sub(r"[^\w\-_.]", "_", raw_output_name)
     if not raw_output_name.lower().endswith(".mp4"):
         raw_output_name += ".mp4"
@@ -201,10 +211,13 @@ def generate_video():
     codec = request.form.get("codec", "libx264")
     resolution_input = request.form.get("resolution", "keep")
     aspect_ratio = request.form.get("aspect_ratio", "keep")
+    keep_audio = request.form.get("keep_audio", "yes") == "yes"
 
     print(f"[INFO] Output: {raw_output_name} | FPS: {fps} | Codec: {codec} | Preset: {preset}")
-    print(f"[INFO] Resolution input: {resolution_input}, Aspect ratio: {aspect_ratio}")
+    print(f"[INFO] Resolution input: {resolution_input}, Aspect ratio: {aspect_ratio}, Giữ âm thanh: {keep_audio}")
 
+    # Xác định độ phân giải
+    resolution = None
     if resolution_input != "keep":
         resolution = resolution_input
     elif aspect_ratio != "keep":
@@ -213,16 +226,16 @@ def generate_video():
             "9:16": "1080x1920",
             "1:1": "1080x1080"
         }.get(aspect_ratio)
-    else:
-        resolution = None
 
     print(f"[INFO] Sử dụng độ phân giải: {resolution}")
 
+    # Tạo thư mục tạm và output
     temp_dir = os.path.join(current_app.root_path, "static", "temp")
     output_dir = os.path.join(current_app.root_path, "static", "outputs")
     os.makedirs(temp_dir, exist_ok=True)
     os.makedirs(output_dir, exist_ok=True)
 
+    # Tránh trùng tên output
     base_name, ext = os.path.splitext(raw_output_name)
     output_name = raw_output_name
     output_path = os.path.join(output_dir, output_name)
@@ -233,9 +246,9 @@ def generate_video():
 
     print(f"[INFO] Đường dẫn output: {output_path}")
 
-    clips = []
-    total_duration = 0
+    clips, total_duration = [], 0
 
+    # Xử lý từng video clip
     for vid_id in video_ids:
         print(f"\n--- ĐANG XỬ LÝ VIDEO ID: {vid_id} ---")
         video = VideoClip.query.get(int(vid_id))
@@ -243,28 +256,24 @@ def generate_video():
             print(f"[⚠️] Không tìm thấy video ID: {vid_id}")
             continue
 
-        cut_key = f"cut_to_{vid_id}"
-        cut_to = request.form.get(cut_key)
-        print(f"[DEBUG] cut_to = {cut_to}")
-
         input_path = (
             video.filepath if os.path.isabs(video.filepath)
             else os.path.join(current_app.root_path, video.filepath)
         )
-        print(f"[DEBUG] input_path = {input_path}")
-
         if not os.path.exists(input_path):
             print(f"[⚠️] File không tồn tại: {input_path}")
             continue
 
+        cut_to = request.form.get(f"cut_to_{vid_id}")
         output_clip_path = os.path.join(temp_dir, f"clip_{vid_id}.mp4")
 
+        # Cấu hình ffmpeg
         cmd = ["ffmpeg", "-y"]
         if cut_to:
             try:
                 cut_duration = float(cut_to)
-                total_duration += cut_duration
                 cmd += ["-ss", "0", "-i", input_path, "-t", str(cut_duration)]
+                total_duration += cut_duration
             except ValueError:
                 flash(f"⚠️ cut_to không hợp lệ cho video ID {vid_id}", "warning")
                 continue
@@ -272,91 +281,65 @@ def generate_video():
             cmd += ["-i", input_path]
             total_duration += video.duration or 0
 
+        # Thiết lập bộ lọc video
         vf_filters = []
         if resolution:
             try:
                 w, h = map(int, resolution.split("x"))
-                w, h = w // 2 * 2, h // 2 * 2
-                vf_filters.append(f"scale={w}:{h}")
+                vf_filters.append(f"scale={w//2*2}:{h//2*2}")
             except Exception as e:
                 flash(f"❌ Lỗi scale: {e}", "danger")
 
         vf_filters.append(f"fps={fps}")
-        vf_filter = ",".join(vf_filters)
+        cmd += ["-vf", ",".join(vf_filters)]
+        cmd += ["-r", str(fps), "-pix_fmt", "yuv420p", "-c:v", codec, "-preset", preset, "-crf", "23"]
 
-        if codec in ["h264_qsv", "hevc_qsv"]:
-            cmd += [
-                "-vf", vf_filter,
-                "-c:v", codec,
-                "-preset", preset,
-                "-look_ahead", "0",
-                "-global_quality", "23",
-                "-c:a", "aac",
-                "-movflags", "+faststart",
-                output_clip_path
-            ]
+        if not keep_audio:
+            cmd += ["-an"]
         else:
-            cmd += [
-                "-vf", vf_filter,
-                "-r", str(fps),
-                "-pix_fmt", "yuv420p",
-                "-c:v", codec,
-                "-preset", preset,
-                "-crf", "23",
-                "-c:a", "aac",
-                "-movflags", "+faststart",
-                output_clip_path
-            ]
+            cmd += ["-c:a", "aac"]
+
+        cmd += ["-movflags", "+faststart", output_clip_path]
 
         print(f"[FFMPEG] CMD: {' '.join(cmd)}")
 
         result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        stderr_output = result.stderr.decode(errors='ignore')
         if result.returncode != 0:
-            print(f"[❌] FFmpeg lỗi cho video ID {vid_id}:\n{stderr_output}")
+            print(f"[❌] FFmpeg lỗi cho video ID {vid_id}:\n{result.stderr.decode(errors='ignore')}")
             continue
 
-        if os.path.exists(output_clip_path):
-            size = os.path.getsize(output_clip_path)
-            print(f"[OK] Clip tạo thành công: {output_clip_path} | Size: {size}")
-            if size > 1000:
-                clips.append(output_clip_path)
-            else:
-                print(f"[⚠️] Clip quá nhỏ, bị bỏ qua.")
+        if os.path.exists(output_clip_path) and os.path.getsize(output_clip_path) > 1000:
+            clips.append(output_clip_path)
+            print(f"[OK] Clip tạo thành công: {output_clip_path}")
         else:
-            print(f"[⚠️] Clip không tồn tại sau khi xử lý.")
+            print(f"[⚠️] Clip lỗi hoặc quá nhỏ.")
 
     if not clips:
-        print("[❌] Không có clip nào được xử lý thành công.")
         flash("❌ Không có clip nào được xử lý thành công", "danger")
         return redirect(url_for("video_merger.index"))
 
+    # Tạo file list để concat
     file_list_path = os.path.join(temp_dir, "file_list.txt")
     with open(file_list_path, "w", encoding="utf-8") as f:
         for clip in clips:
             abs_path = os.path.abspath(clip)
             f.write(f"file '{abs_path}'\n")
-            print(f"[LIST] Thêm vào file_list.txt: {abs_path}")
 
+    # Lệnh ghép clip
     concat_cmd = [
-        "ffmpeg", "-y",
-        "-f", "concat", "-safe", "0",
+        "ffmpeg", "-y", "-f", "concat", "-safe", "0",
         "-i", file_list_path,
         "-c:v", codec if codec in ["libx264", "h264_qsv", "hevc_qsv"] else "libx264",
-        "-preset", preset,
-        "-crf", "23",
-        "-c:a", "aac",
-        "-movflags", "+faststart",
-        output_path
+        "-preset", preset, "-crf", "23"
     ]
+    concat_cmd += ["-an"] if not keep_audio else ["-c:a", "aac"]
+    concat_cmd += ["-movflags", "+faststart", output_path]
 
     print(f"[FFMPEG] CONCAT CMD: {' '.join(concat_cmd)}")
 
-    concat_result = subprocess.run(concat_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    concat_stderr = concat_result.stderr.decode(errors='ignore')
-    if concat_result.returncode != 0:
-        print(f"[❌] Lỗi khi concat các clip:\n{concat_stderr}")
+    result = subprocess.run(concat_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode != 0:
+        print(f"[❌] Lỗi khi ghép clip:\n{result.stderr.decode(errors='ignore')}")
         flash("❌ Lỗi khi ghép các clip", "danger")
     else:
         print(f"[✅] Ghép video thành công: {output_path}")
