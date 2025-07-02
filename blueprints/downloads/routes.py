@@ -357,3 +357,125 @@ def download_format_only():
         logging.error(f"Error downloading format only: {e}")
 
     return redirect('/')
+
+
+@download_bp.route('/api/urls')
+def api_get_urls():
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    status = request.args.get('status')  # <-- lấy thêm trạng thái
+
+    query = DownloadUrl.query.order_by(DownloadUrl.created_at.desc())
+
+    if status:  # <-- nếu có chọn trạng thái thì lọc
+        query = query.filter(DownloadUrl.status == status)
+
+    pagination = query.paginate(page=page, per_page=per_page)
+
+    def serialize(item):
+        return {
+            "id": item.id,
+            "url": item.url,
+            "category": item.category,
+            "status": item.status,
+            "title": item.title or "",
+            "ratio": item.ratio or "",
+            "created_at": item.created_at.strftime('%Y-%m-%d %H:%M')
+        }
+
+    return {
+        "urls": [serialize(u) for u in pagination.items],
+        "page": page,
+        "per_page": per_page,
+        "total_pages": pagination.pages
+    }
+
+@download_bp.route('/batch/download_range', methods=['POST'])
+def batch_download_by_id_range():
+    start_id = request.form.get('start_id', type=int)
+    end_id = request.form.get('end_id', type=int)
+
+    if start_id is None or end_id is None or start_id > end_id:
+        flash("⚠️ Vui lòng nhập khoảng ID hợp lệ.", "danger")
+        return redirect(request.referrer or '/downloads')
+
+    urls = DownloadUrl.query.filter(
+        DownloadUrl.id >= start_id,
+        DownloadUrl.id <= end_id
+    ).all()
+
+    if not urls:
+        flash(f"❗ Không tìm thấy URL nào từ ID {start_id} đến {end_id}", "warning")
+        return redirect(request.referrer or '/downloads')
+
+    cookies_file = 'cookies.txt'
+    output_path = current_app.config.get('OUTPUT_PATH')
+
+    if not os.path.exists(cookies_file):
+        flash("❗ Không tìm thấy file cookies.txt.")
+        return redirect('/downloads')
+
+    downloaded_titles = []
+
+    for download_url in urls:
+        url = download_url.url
+        try:
+            with yt_dlp.YoutubeDL({'quiet': True, 'cookies': cookies_file}) as ydl:
+                info = ydl.extract_info(url, download=False)
+                formats = info.get('formats', [])
+                title = info.get('title', 'Không rõ tiêu đề')
+
+            best_video = sorted(
+                [f for f in formats if f.get('vcodec') != 'none' and f.get('ext') == 'mp4'],
+                key=lambda x: x.get('height') or 0,
+                reverse=True
+            )
+            best_audio = sorted(
+                [f for f in formats if f.get('acodec') != 'none' and f.get('vcodec') == 'none' and f.get('ext') == 'm4a'],
+                key=lambda x: x.get('abr') or 0,
+                reverse=True
+            )
+
+            best_video_format = best_video[0] if best_video else None
+            best_audio_format = best_audio[0] if best_audio else None
+
+            if best_video_format and best_audio_format:
+                format_str = f"{best_video_format['format_id']}+{best_audio_format['format_id']}"
+            elif best_video_format:
+                format_str = best_video_format['format_id']
+            else:
+                format_str = 'best'
+
+            ydl_opts = {
+                'format': format_str,
+                'outtmpl': os.path.join(output_path, '%(id)s.%(ext)s'),
+                'quiet': False,
+                'merge_output_format': 'mp4',
+                'cookies': cookies_file,
+                'postprocessors': [
+                    {'key': 'FFmpegVideoConvertor', 'preferedformat': 'mp4'}
+                ],
+            }
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+
+            downloaded_titles.append(title)
+            download_url.status = 'completed'
+            download_url.title = title
+            db.session.commit()
+
+        except Exception as e:
+            logging.error(f"❌ Lỗi khi tải {url}: {e}")
+            flash(f"❌ Lỗi với {url}: {e}")
+            download_url.status = 'failed'
+            db.session.commit()
+
+    if downloaded_titles:
+        flash(f"✅ Đã tải {len(downloaded_titles)} video từ ID {start_id} đến {end_id}.")
+        for title in downloaded_titles:
+            flash(f"• {title}")
+    else:
+        flash("⚠️ Không có video nào được tải.")
+
+    return redirect('/downloads')    
