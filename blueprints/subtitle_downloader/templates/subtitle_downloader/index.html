@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Tải Phụ Đề{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4">📝 Tải Phụ Đề từ Video</h2>
+
+    <form method="POST" class="mb-4">
+        <div class="mb-3">
+            <label for="video_url" class="form-label">🎥 URL Video</label>
+            <input type="url" name="video_url" id="video_url" class="form-control" required value="{{ video_url }}">
+        </div>
+        <button type="submit" class="btn btn-primary">🔍 Hiển Thị Phụ Đề</button>
+    </form>
+
+    {% if available_subs %}
+        <hr>
+        <h4>📋 Danh sách phụ đề:</h4>
+
+        <form method="POST" action="{{ url_for('subtitle_downloader.download_sub') }}">
+            <input type="hidden" name="video_url" value="{{ video_url }}">
+            <input type="hidden" name="video_title" value="{{ video_title }}">
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="lang_code" class="form-label">🌐 Ngôn ngữ:</label>
+                    <select name="lang_code" id="lang_code" class="form-select" required>
+                        {% for lang, info in available_subs.items() %}
+                            <option value="{{ lang }}">{{ lang }} - {{ info.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="subtitle_format" class="form-label">📄 Định dạng:</label>
+<select name="subtitle_format" id="subtitle_format" class="form-select" required>
+    {% set selected_lang = available_subs[request.form.get("lang_code") or available_subs.keys()|list|first] %}
+    {% set supported_formats = selected_lang.formats %}
+
+    {% for fmt in ['srt', 'vtt', 'json', 'ttml', 'srv1', 'srv2', 'srv3'] %}
+        {% if fmt in supported_formats %}
+            <option value="{{ fmt }}">{{ fmt|upper }} ({{ '.' + fmt }})</option>
+        {% else %}
+            <option value="{{ fmt }}" disabled>{{ fmt|upper }} (Không có)</option>
+        {% endif %}
+    {% endfor %}
+</select>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-success mt-2">⬇️ Tải Phụ Đề</button>
+        </form>
+    {% endif %}
+
+    {% if downloaded_file %}
+        <hr>
+        <div class="alert alert-info mt-4">
+            ✅ Phụ đề đã được tải xong! 👉 <a href="{{ url_for('subtitle_downloader.serve_subtitle', filename=downloaded_file) }}" class="btn btn-sm btn-outline-primary">Tải File Về</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const formatMap = {{ available_subs | tojson }};
+    const langSelect = document.getElementById("lang_code");
+    const formatSelect = document.getElementById("subtitle_format");
+
+    function updateFormats() {
+        const selectedLang = langSelect.value;
+        const formats = formatMap[selectedLang]?.formats || [];
+
+        formatSelect.innerHTML = "";
+
+        const allFormats = ["srt", "vtt", "json", "ttml", "srv1", "srv2", "srv3"];
+
+        allFormats.forEach(fmt => {
+            const opt = document.createElement("option");
+            opt.value = fmt;
+            opt.textContent = fmt.toUpperCase() + " (." + fmt + ")";
+
+            if (formats.includes(fmt)) {
+                formatSelect.appendChild(opt);
+            } else {
+                opt.disabled = true;
+                opt.textContent += " - Không có";
+                formatSelect.appendChild(opt);
+            }
+        });
+    }
+
+    langSelect.addEventListener("change", updateFormats);
+    window.addEventListener("DOMContentLoaded", updateFormats);
+</script>
+
+
+{% endblock %}
+

@@ -17,6 +17,8 @@ from blueprints.frame_extractor.routes import frame_extractor_bp
 from blueprints.subtitle_export.routes import subtitle_export_bp
 from blueprints.video_merger.routes import video_merger_bp
 
+from blueprints.subtitle_downloader.routes import subtitle_downloader_bp
+
 from scheduler import start_scheduler
 
 import os
@@ -60,6 +62,7 @@ def create_app():
     app.register_blueprint(frame_extractor_bp, url_prefix='/frame_extractor')
     app.register_blueprint(subtitle_export_bp, url_prefix='/subtitle_export')
     app.register_blueprint(video_merger_bp, url_prefix="/video_merger")
+    app.register_blueprint(subtitle_downloader_bp, url_prefix='/subtitle_downloader')
 
     with app.app_context():
         db.create_all()
