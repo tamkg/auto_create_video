@@ -67,9 +67,38 @@
 <!-- Quản lý URL -->
 <div class="card mb-4">
     <div class="card-body">
+        <!-- Tải video theo khoảng ID -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h3 class="card-title mb-3">📌 Tải video theo ID</h3>
+                <form method="POST" action="/downloads/batch/download_range" class="row g-2 align-items-end">
+                    <div class="col-auto">
+                        <label for="start-id" class="form-label">ID bắt đầu:</label>
+                        <input type="number" name="start_id" id="start-id" class="form-control" required>
+                    </div>
+                    <div class="col-auto">
+                        <label for="end-id" class="form-label">ID kết thúc:</label>
+                        <input type="number" name="end_id" id="end-id" class="form-control" required>
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-success">⬇️ Tải từ ID</button>
+                    </div>
+                </form>
+            </div>
+        </div>
         <h3 class="card-title mb-3">📋 Danh sách URL đã lưu trong hệ thống</h3>
-        {% if urls %}
         <form id="bulk-download-form" method="POST" action="/downloads/batch/download">
+            <input type="hidden" name="selected_ids_json" id="selected-ids-json">
+            <div class="mb-3">
+                <label for="status-filter" class="form-label">Lọc theo trạng thái:</label>
+                <select id="status-filter" class="form-select form-select-sm w-auto d-inline" onchange="applyFilter()">
+                    <option value="">-- Tất cả trạng thái --</option>
+                    <option value="pending">⏳ Đang xử lý</option>
+                    <option value="completed">✅ Hoàn thành</option>
+                    <option value="failed">❌ Thất bại</option>
+                </select>
+            </div>
+
             <div class="table-responsive">
                 <table class="table table-striped table-bordered">
                     <thead class="table-dark">
@@ -84,74 +113,18 @@
                             <th>🕒 Tạo lúc</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        {% for item in urls %}
-                        <tr>
-                            <td><input type="checkbox" name="selected_urls" value="{{ item.id }}"></td>
-                            <td>{{ item.id }}</td>
-                            <td><a href="{{ item.url }}" target="_blank">{{ item.url }}</a></td>
-                            <td>{{ item.category }}</td>
-                            <td>
-                                {% if item.status == "pending" %}
-                                    <span class="badge bg-warning text-dark">⏳ Đang xử lý</span>
-                                {% elif item.status == "completed" %}
-                                    <span class="badge bg-success">✅ Hoàn thành</span>
-                                {% elif item.status == "failed" %}
-                                    <span class="badge bg-danger">❌ Thất bại</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">⚪ Chưa xác định</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ item.title or '' }}</td>
-                            <td>{{ item.ratio or '' }}</td>
-                            <td>{{ item.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
+                    <tbody id="url-table-body"></tbody>
                 </table>
+
+                <div class="d-flex justify-content-center align-items-center mt-2 gap-2">
+                    <input type="number" id="jump-page-input" min="1" class="form-control" style="width: 80px;" placeholder="Trang...">
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="jumpToPage()">Đi</button>
+                </div>
             </div>
 
-            <!-- Pagination -->
+            <!-- AJAX Pagination -->
             <nav aria-label="Page navigation">
-                <ul class="pagination justify-content-center">
-                    {% if page > 1 %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ page - 1 }}&per_page={{ per_page }}">Trang trước</a>
-                    </li>
-                    {% endif %}
-
-                    {% if start_page > 1 %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page=1&per_page={{ per_page }}">1</a>
-                    </li>
-                    {% if start_page > 2 %}
-                    <li class="page-item disabled">
-                        <span class="page-link">...</span>
-                    </li>
-                    {% endif %}
-                    {% endif %}
-
-                    {% for p in range(start_page, end_page + 1) %}
-                    <li class="page-item {% if p == page %}active{% endif %}">
-                        <a class="page-link" href="?page={{ p }}&per_page={{ per_page }}">{{ p }}</a>
-                    </li>
-                    {% endfor %}
-
-                    {% if end_page < total_pages %}
-                    <li class="page-item disabled">
-                        <span class="page-link">...</span>
-                    </li>
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ total_pages }}&per_page={{ per_page }}">{{ total_pages }}</a>
-                    </li>
-                    {% endif %}
-
-                    {% if page < total_pages %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ page + 1 }}&per_page={{ per_page }}">Trang sau</a>
-                    </li>
-                    {% endif %}
-                </ul>
+                <ul class="pagination justify-content-center"></ul>
             </nav>
 
             <!-- Nút tải các video đã chọn -->
@@ -159,15 +132,17 @@
                 <button type="submit" class="btn btn-primary">⬇️ Tải các video đã chọn</button>
             </div>
         </form>
-        {% else %}
-            <p class="text-muted">Chưa có URL nào được lưu trong hệ thống.</p>
-        {% endif %}
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+let selectedIds = new Set();
+let currentPage = {{ page }};
+let perPage = {{ per_page }};
+let totalPages = {{ total_pages }};
+
 function loadFormats() {
     const url = document.getElementById('video-url').value.trim();
     if (!url) return alert("Vui lòng nhập URL video trước.");
@@ -202,8 +177,7 @@ function generateFormatTable(formats) {
                         <th>Tải xuống</th>
                     </tr>
                 </thead>
-                <tbody>
-    `;
+                <tbody>`;
 
     for (const f of formats) {
         const isVideo = f.vcodec !== 'none';
@@ -222,27 +196,113 @@ function generateFormatTable(formats) {
                         <button type="submit" class="btn btn-sm btn-success">⬇️</button>
                     </form>
                 </td>
-            </tr>
-        `;
+            </tr>`;
     }
 
-    table += `
-                </tbody>
-            </table>
-        </div>
-    `;
+    table += `</tbody></table></div>`;
     return table;
 }
 
-function toggleSelectAll(masterCheckbox) {
-    document.querySelectorAll('input[name="selected_urls"]').forEach(cb => cb.checked = masterCheckbox.checked);
+function toggleCheckbox(id, checked) {
+    if (checked) selectedIds.add(id);
+    else selectedIds.delete(id);
 }
 
-function updatePerPage(perPage) {
-    const url = new URL(window.location.href);
-    url.searchParams.set('per_page', perPage);
-    url.searchParams.set('page', 1);
-    window.location.href = url;
+function toggleSelectAll(masterCheckbox) {
+    document.querySelectorAll('input[name="selected_urls"]').forEach(cb => {
+        cb.checked = masterCheckbox.checked;
+        toggleCheckbox(cb.value, cb.checked);
+    });
 }
+
+function renderTable(urls) {
+    const tbody = document.getElementById("url-table-body");
+    tbody.innerHTML = urls.map(item => `
+        <tr>
+            <td><input type="checkbox" name="selected_urls" value="${item.id}" ${selectedIds.has(item.id.toString()) ? 'checked' : ''}
+                onchange="toggleCheckbox('${item.id}', this.checked)"></td>
+            <td>${item.id}</td>
+            <td><a href="${item.url}" target="_blank">${item.url}</a></td>
+            <td>${item.category}</td>
+            <td>${renderStatus(item.status)}</td>
+            <td>${item.title}</td>
+            <td>${item.ratio}</td>
+            <td>${item.created_at}</td>
+        </tr>`).join('');
+}
+
+function renderStatus(status) {
+    if (status === "pending") return `<span class="badge bg-warning text-dark">⏳ Đang xử lý</span>`;
+    if (status === "completed") return `<span class="badge bg-success">✅ Hoàn thành</span>`;
+    if (status === "failed") return `<span class="badge bg-danger">❌ Thất bại</span>`;
+    return `<span class="badge bg-secondary">⚪ Chưa xác định</span>`;
+}
+
+function renderPagination(current, total) {
+    const container = document.querySelector(".pagination");
+    container.innerHTML = "";
+
+    const createPage = (p, label = null, disabled = false, active = false) => {
+        const li = document.createElement("li");
+        li.className = "page-item" + (disabled ? " disabled" : "") + (active ? " active" : "");
+        li.innerHTML = `<a class="page-link" href="#" onclick="loadUrlPage(${p}); return false;">${label || p}</a>`;
+        return li;
+    };
+
+    if (current > 1) container.appendChild(createPage(current - 1, "«"));
+
+    let start = Math.max(1, current - 2);
+    let end = Math.min(total, current + 2);
+
+    if (start > 1) {
+        container.appendChild(createPage(1));
+        if (start > 2) container.innerHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+    }
+
+    for (let i = start; i <= end; i++) {
+        container.appendChild(createPage(i, null, false, i === current));
+    }
+
+    if (end < total) {
+        if (end < total - 1) container.innerHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        container.appendChild(createPage(total));
+    }
+
+    if (current < total) container.appendChild(createPage(current + 1, "»"));
+}
+
+function loadUrlPage(page) {
+    const status = document.getElementById("status-filter").value;
+    fetch(`/downloads/api/urls?page=${page}&per_page=${perPage}&status=${status}`)
+        .then(res => res.json())
+        .then(data => {
+            currentPage = data.page;
+            totalPages = data.total_pages;
+            renderTable(data.urls);
+            renderPagination(currentPage, totalPages);
+        });
+}
+
+function applyFilter() {
+    loadUrlPage(1);
+}
+
+function jumpToPage() {
+    const input = document.getElementById("jump-page-input");
+    let targetPage = parseInt(input.value);
+    if (isNaN(targetPage) || targetPage < 1 || targetPage > totalPages) {
+        alert(`Trang không hợp lệ. Nhập từ 1 đến ${totalPages}.`);
+        return;
+    }
+    loadUrlPage(targetPage);
+}
+
+document.getElementById("bulk-download-form").addEventListener("submit", function (e) {
+    document.getElementById("selected-ids-json").value = JSON.stringify(Array.from(selectedIds));
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    loadUrlPage(currentPage);
+});
 </script>
 {% endblock %}
