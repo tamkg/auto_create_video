@@ -15,9 +15,13 @@ def is_valid_url(url):
 
 @url_manager_bp.route('/manage', methods=['GET'])
 def manage_urls():
-    urls = DownloadUrl.query.all()
+    urls = DownloadUrl.query.order_by(DownloadUrl.id.desc()).limit(10).all()
     return render_template('urls/urls.html', urls=urls)
 
+@url_manager_bp.route('/all', methods=['GET'])
+def all_urls():
+    urls = DownloadUrl.query.order_by(DownloadUrl.id.desc()).all()
+    return render_template('urls/all_urls.html', urls=urls, all_mode=True)
 
 def is_playlist(info):
     return info.get('_type') == 'playlist'
