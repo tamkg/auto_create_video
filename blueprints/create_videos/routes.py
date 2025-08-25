@@ -332,8 +332,13 @@ def export_video(video_id):
                         top = (new_height - target_size[1]) // 2
                         img = img.crop((0, top, target_size[0], top + target_size[1]))
 
+                    # ✅ Sửa tại đây
+                    if img.mode != "RGB":
+                        img = img.convert("RGB")
+
                     resized_img_path = os.path.join(temp_dir, f"resized_{i}.jpg")
                     img.save(resized_img_path, quality=95)
+
 
                 # --- Ghép ảnh + audio ---
                 audio_clip = AudioFileClip(audio_path)
